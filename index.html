@@ -2193,15 +2193,73 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
     }
 
     // ============================================================
-    // RotationController（Task 13.1）
-    // 回転状態の管理とジェスチャー入力処理。
-    // 要件 5.2–5.7, 5.8–5.11, 7.2
+    // RotationController（Task 13.1 — 改修: 差分回転の積み重ね方式）
+    // 内部状態を回転行列で保持し、ドラッグ操作を「現在の向きからの差分回転」として適用する。
+    // 表示用の Yaw/Pitch/Roll はオイラー角に逆分解して求める。
     // ============================================================
     const RotationController = {
       state: { yaw: 0, pitch: 0, roll: 0, rollToggle: false },
+      // 内部の累積回転行列（9要素 row-major 3×3）。初期は単位行列。
+      _matrix: new Float64Array([1,0,0, 0,1,0, 0,0,1]),
       _listeners: [],
-      _gesture: null, // { startX, startY, direction: null|'horizontal'|'vertical', lastX, lastY }
+      _gesture: null,
       _sensitivity: 0.5, // degrees per pixel
+
+      // 3×3 行列の積 A·B を返す（row-major）
+      _matMul3(A, B) {
+        const C = new Float64Array(9);
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            C[i*3+j] = A[i*3]*B[j] + A[i*3+1]*B[3+j] + A[i*3+2]*B[6+j];
+          }
+        }
+        return C;
+      },
+
+      // 累積行列からオイラー角（Yaw/Pitch/Roll）を逆分解する
+      // R = Rz(yaw)·Ry(pitch)·Rx(roll) の逆分解
+      _matrixToEuler(M) {
+        // M[6] = -sin(pitch)
+        const sinPitch = -M[6];
+        let pitch, yaw, roll;
+        if (Math.abs(sinPitch) >= 0.9999) {
+          // ジンバルロック近傍
+          pitch = sinPitch > 0 ? 90 : -90;
+          yaw = Math.atan2(-M[5], M[4]) * 180 / Math.PI;
+          roll = 0;
+        } else {
+          pitch = Math.asin(sinPitch) * 180 / Math.PI;
+          yaw = Math.atan2(M[3], M[0]) * 180 / Math.PI;
+          roll = Math.atan2(M[7], M[8]) * 180 / Math.PI;
+        }
+        return {
+          yaw: ((yaw % 360) + 360) % 360,
+          pitch: Math.max(-90, Math.min(90, pitch)),
+          roll: ((roll % 360) + 360) % 360,
+        };
+      },
+
+      // 差分回転を現在の行列に左から掛ける（ワールド固定軸まわりの回転）
+      _applyDelta(deltaYawDeg, deltaPitchDeg) {
+        const DEG2RAD = Math.PI / 180;
+        // Yaw 差分: ワールドの Z 軸（鉛直軸）まわり
+        const a = deltaYawDeg * DEG2RAD;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const Rz = new Float64Array([ca,-sa,0, sa,ca,0, 0,0,1]);
+        // Pitch 差分: ワールドの Y 軸（左右軸）まわり
+        const b = deltaPitchDeg * DEG2RAD;
+        const cb = Math.cos(b), sb = Math.sin(b);
+        const Ry = new Float64Array([cb,0,sb, 0,1,0, -sb,0,cb]);
+        // 合成: 新しい行列 = Ry · Rz · 現在の行列
+        // （ワールド固定軸まわりの回転は左から掛ける）
+        this._matrix = this._matMul3(Ry, this._matMul3(Rz, this._matrix));
+        // オイラー角に逆分解して state を更新
+        const euler = this._matrixToEuler(this._matrix);
+        this.state.yaw = euler.yaw;
+        this.state.pitch = euler.pitch;
+        // Roll はドラッグでは変えない（スライダーのみ）
+        // ただし行列から分解された roll は無視し、スライダーの値を維持
+      },
 
       beginGesture(x, y) {
         this._gesture = { startX: x, startY: y, direction: null, lastX: x, lastY: y };
@@ -2213,7 +2271,6 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         const dx = x - g.startX;
         const dy = y - g.startY;
 
-        // Determine direction if not yet classified
         if (!g.direction) {
           const dir = window.AmbiMath.classifyGesture(dx, dy, 5);
           if (dir === 'none') return;
@@ -2223,23 +2280,20 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
           return;
         }
 
-        // Apply delta based on classified direction
         const deltaX = x - g.lastX;
         const deltaY = y - g.lastY;
         g.lastX = x;
         g.lastY = y;
 
         if (g.direction === 'horizontal') {
-          // Right = positive dx = Yaw increases
-          this.state.yaw = window.AmbiMath.applyYawDelta(this.state.yaw, deltaX, this._sensitivity);
+          // 右ドラッグ = Yaw 差分（ワールド Z 軸まわり）
+          this._applyDelta(deltaX * this._sensitivity, 0);
           this._notify();
         } else if (g.direction === 'vertical') {
-          // Up = negative deltaY in screen coords = Pitch increases
-          // applyPitchDelta expects positive = up, so negate screen deltaY
-          this.state.pitch = window.AmbiMath.applyPitchDelta(this.state.pitch, -deltaY, this._sensitivity);
+          // 上ドラッグ = Pitch 差分（ワールド Y 軸まわり）
+          this._applyDelta(0, -deltaY * this._sensitivity);
           this._notify();
         }
-        // Roll is NOT changed by drag gestures (Requirement 5.7)
       },
 
       endGesture() {
@@ -2248,26 +2302,35 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
 
       setRollEnabled(enabled) {
         this.state.rollToggle = !!enabled;
-        // Don't change roll value when toggling (Requirement 5.10: preserve previous value)
         this._notify();
       },
 
       setRoll(deg) {
-        if (!this.state.rollToggle) return; // Only allow when toggle is enabled
+        if (!this.state.rollToggle) return;
         this.state.roll = window.AmbiMath.normalizeAngle360(deg);
         this._notify();
       },
 
       reset() {
-        // Reset all axes to 0 regardless of rollToggle state (Requirement 7.2)
         this.state.yaw = 0;
         this.state.pitch = 0;
         this.state.roll = 0;
+        this._matrix = new Float64Array([1,0,0, 0,1,0, 0,0,1]);
         this._notify();
       },
 
       getState() {
         return { ...this.state };
+      },
+
+      // 外部から姿勢を設定する（URL パラメータ復元用）
+      setState(yaw, pitch, roll) {
+        this.state.yaw = yaw;
+        this.state.pitch = pitch;
+        this.state.roll = roll;
+        // 行列も再構築
+        this._matrix = window.AmbiMath.buildR3(yaw, pitch, 0);
+        this._notify();
       },
 
       onChange(callback) {
@@ -4330,20 +4393,15 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
           if (AppState.track.loadingState === 'loaded') {
             // Apply rotation (Yaw/Pitch/Roll)
             if (params.yaw !== 0 || params.pitch !== 0 || params.roll !== 0) {
-              RotationController.state.yaw = params.yaw;
-              RotationController.state.pitch = params.pitch;
-              RotationController.state.roll = params.roll;
-              RotationController._notify();
+              RotationController.setState(params.yaw, params.pitch, params.roll);
             }
 
             // Apply Roll toggle
             if (params.rollToggle) {
               RotationController.setRollEnabled(true);
-              const rollBtn = document.getElementById('roll-toggle-btn');
-              rollBtn.setAttribute('aria-pressed', 'true');
-              rollBtn.classList.add('mode-btn-active');
+              const rollEl = document.getElementById('roll-display');
+              if (rollEl) rollEl.setAttribute('aria-pressed', 'true');
               document.getElementById('roll-slider-container').hidden = false;
-              // Sync slider value
               document.getElementById('roll-slider').value = Math.round(window.AmbiMath.normalizeAngle360(params.roll));
             }
 
