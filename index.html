@@ -1551,6 +1551,7 @@
         rollToggle: false,
         mode: 'binaural',
         vol: 100,
+        t: 0,
         loop: false,
       };
 
@@ -1594,6 +1595,12 @@
           url.searchParams.set('vol', String(vol));
         }
 
+        // t: 再生開始位置（秒、小数1桁まで。既定 0 は省略）
+        const t = Math.max(0, parseFloat(state.t) || 0);
+        if (t > 0) {
+          url.searchParams.set('t', String(Math.round(t * 10) / 10));
+        }
+
         if (state.loop) {
           url.searchParams.set('loop', '1');
         }
@@ -1635,10 +1642,15 @@
           vol = isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : SHARE_DEFAULTS.vol;
         }
 
-        const autoplay = false; // 廃止: src 指定時は常に自動再生
+        let t = SHARE_DEFAULTS.t;
+        if (params.has('t')) {
+          const parsed = parseFloat(params.get('t'));
+          t = isFinite(parsed) ? Math.max(0, parsed) : SHARE_DEFAULTS.t;
+        }
+
         const loop = params.get('loop') === '1';
 
-        return { src, yaw, pitch, roll, rollToggle, mode, vol, loop };
+        return { src, yaw, pitch, roll, rollToggle, mode, vol, t, loop };
       };
     })();
 
@@ -3595,6 +3607,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
           rollToggle: RotationController.state.rollToggle,
           mode: AppState.decodeMode,
           vol: Math.round(AppState.volume * 100),
+          t: AppState.playback.currentTime,
           loop: AppState.isLooping,
         });
 
@@ -3771,6 +3784,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         rollToggle: RotationController.state.rollToggle,
         mode: AppState.decodeMode,
         vol: Math.round(AppState.volume * 100),
+        t: AppState.playback.currentTime,
         loop: AppState.isLooping,
       };
       const shareUrl = ShareManager.generateShareUrl(state);
@@ -4248,6 +4262,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         if (params.rollToggle) { optionItems.push('Roll操作: ON'); }
         if (params.mode === 'stereo') { optionItems.push('モード: ステレオ'); }
         if (params.vol !== 100) { optionItems.push('音量: ' + params.vol + '%'); }
+        if (params.t > 0) { optionItems.push('開始位置: ' + window.AmbiMath.formatTime(params.t)); }
         if (params.loop) { optionItems.push('ループ: ON'); }
         if (optionItems.length > 0) {
           optionsHtml = '<p style="font-size:0.78rem;color:#8888aa;margin:8px 0 0;">' + optionItems.join(' / ') + '</p>';
@@ -4317,6 +4332,16 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
               AppState.volume = vol;
               audioEngine.setVolume(vol);
               UI.els.volumeA.value = vol;
+            }
+
+            // 再生開始位置を適用
+            if (params.t > 0) {
+              AppState.playback.currentTime = params.t;
+              audioEngine._playbackState.offset = params.t;
+              const duration = audioEngine.getDuration();
+              if (duration > 0) {
+                UI.updateProgress(params.t, duration);
+              }
             }
 
             // src 指定時は読み込み成功で常に自動再生
