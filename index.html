@@ -1,0 +1,4334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmbisonicsPlayer</title>
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #0d0d1a;
+      --color-bg-panel: #141428;
+      --color-bg-input: #1a1a35;
+      --color-bg-hover: #1e1e3a;
+      --color-text: #e0e0f0;
+      --color-text-muted: #8888aa;
+      --color-track-a: #00d4ff;
+      --color-track-a-dim: rgba(0, 212, 255, 0.15);
+      --color-track-b: #ff6b9d;
+      --color-track-b-dim: rgba(255, 107, 157, 0.15);
+      --color-accent: #7c5cff;
+      --color-border: #2a2a4a;
+      --color-error: #ff4466;
+      --color-error-bg: rgba(255, 68, 102, 0.1);
+      --color-success: #44ff88;
+      --color-slider-track: #2a2a4a;
+      --color-slider-thumb: #e0e0f0;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --transition-fast: 0.15s ease;
+      --transition-normal: 0.25s ease;
+    }
+
+    /* ===== Reset & Base ===== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ===== Accessibility: Visually Hidden ===== */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ===== Header ===== */
+    header {
+      text-align: center;
+      padding: 20px 16px 12px;
+      background: linear-gradient(180deg, rgba(124, 92, 255, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: linear-gradient(135deg, var(--color-track-a), var(--color-accent), var(--color-track-b));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .readme-link {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .readme-link:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-muted);
+    }
+
+    /* ===== App Container: 2-Column Grid (single track + center) ===== */
+    .app-container {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.2fr) minmax(0, 1fr);
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px 16px;
+      min-height: calc(100vh - 80px);
+      align-items: start;
+    }
+
+    /* センターパネル非表示時は1カラムに */
+    .app-container:has(> .center-panel[hidden]) {
+      grid-template-columns: 1fr;
+      max-width: 600px;
+    }
+
+    /* ===== Track Panels ===== */
+    .track-panel {
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    #track-a {
+      border-top: 3px solid var(--color-track-a);
+    }
+
+    .track-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    #track-a .track-title {
+      color: var(--color-track-a);
+    }
+
+    /* ===== URL Input & Load Button ===== */
+    .track-url-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .url-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .url-input:focus {
+      border-color: var(--color-accent);
+    }
+
+    #track-a .url-input:focus {
+      border-color: var(--color-track-a);
+    }
+
+    .load-btn {
+      padding: 10px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      color: var(--color-text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      white-space: nowrap;
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .load-btn:hover {
+      background: var(--color-bg-hover);
+    }
+
+    #track-a .load-btn:hover {
+      border-color: var(--color-track-a);
+      color: var(--color-track-a);
+    }
+
+    .load-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* ===== Source Status ===== */
+    .track-source-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: var(--color-bg-input);
+      border-radius: var(--radius-sm);
+      min-height: 32px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .source-status-text {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .source-status-text.loaded-local {
+      color: var(--color-accent);
+    }
+
+    .source-status-text.loaded-network {
+      color: var(--color-success);
+    }
+
+    .source-clear-btn {
+      padding: 2px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+      min-width: 28px;
+      min-height: 28px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .source-clear-btn:hover {
+      color: var(--color-error);
+      border-color: var(--color-error);
+    }
+
+    .source-clear-btn[hidden] {
+      display: none;
+    }
+
+    /* ===== Load Section Labels ===== */
+    .track-load-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .load-section-label {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ===== File Select Button ===== */
+    .track-file-controls {
+      display: flex;
+    }
+
+    .file-select-btn {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      min-height: 40px;
+    }
+
+    .file-select-btn:hover {
+      background: var(--color-bg-hover);
+      border-color: var(--color-accent);
+      color: var(--color-text);
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    /* Drop zone highlight on track panel */
+    .track-panel.drop-active {
+      border-color: var(--color-accent) !important;
+      box-shadow: inset 0 0 20px rgba(124, 92, 255, 0.1);
+    }
+
+    /* ===== Loading Indicator ===== */
+    .loading-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(124, 92, 255, 0.08);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    .loading-indicator[hidden] {
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #track-a .spinner {
+      border-top-color: var(--color-track-a);
+    }
+
+    /* ===== Error Display ===== */
+    .error-display {
+      padding: 10px 14px;
+      background: var(--color-error-bg);
+      border: 1px solid rgba(255, 68, 102, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--color-error);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .error-display[hidden] {
+      display: none;
+    }
+
+    /* ===== Track Warning ===== */
+    .track-warning {
+      padding: 8px 12px;
+      background: rgba(255, 180, 0, 0.1);
+      border: 1px solid rgba(255, 180, 0, 0.3);
+      border-radius: var(--radius-sm);
+      color: #ffb400;
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .track-warning[hidden] {
+      display: none;
+    }
+
+    .waveform-canvas.disabled {
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    /* ===== Format Info Display (Task 18.1) ===== */
+    .format-info {
+      padding: 6px 10px;
+      background: rgba(124, 92, 255, 0.08);
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      color: var(--color-accent);
+      text-align: center;
+    }
+    .format-info[hidden] { display: none; }
+
+    /* ===== App Footer (Task 18.4) ===== */
+    .app-footer {
+      text-align: center;
+      padding: 12px 16px;
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+    }
+
+    /* ===== Track Info ===== */
+    .track-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      min-height: 20px;
+    }
+
+    .track-name {
+      word-break: break-all;
+    }
+
+    .track-duration {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== Waveform Canvas ===== */
+    .waveform-canvas {
+      width: 100%;
+      height: 80px;
+      background: var(--color-bg-input);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: block;
+    }
+
+    /* ===== Volume Control (Vertical Slider) ===== */
+    .volume-control {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .volume-control label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+    }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      cursor: pointer;
+      min-height: 44px;
+      padding: 16px 0;
+    }
+
+    /* Volume slider track */
+    .volume-slider::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+    }
+
+    .volume-slider::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+      border: none;
+    }
+
+    /* Volume slider thumb */
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--color-slider-thumb);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      margin-top: -7px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: var(--color-slider-thumb);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    #track-a .volume-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-a);
+      transform: scale(1.15);
+    }
+
+    #track-a .volume-slider::-moz-range-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-a);
+      transform: scale(1.15);
+    }
+
+    /* ===== Center Panel ===== */
+    .center-panel {
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .center-panel[hidden] {
+      display: none;
+    }
+
+    /* ===== Transport Controls ===== */
+    .transport-controls {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .transport-btn {
+      padding: 12px 24px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-input);
+      color: var(--color-text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast),
+                  transform var(--transition-fast), box-shadow var(--transition-fast);
+      min-height: 48px;
+      min-width: 48px;
+      user-select: none;
+    }
+
+    .transport-btn:hover:not(:disabled) {
+      background: var(--color-bg-hover);
+      border-color: var(--color-accent);
+    }
+
+    .transport-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .transport-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Play button specific */
+    #play-btn:not(:disabled):hover {
+      border-color: var(--color-success);
+      box-shadow: 0 0 12px rgba(68, 255, 136, 0.15);
+    }
+
+    /* Loop button active state */
+    #loop-btn[aria-pressed="true"] {
+      background: rgba(124, 92, 255, 0.2);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      box-shadow: 0 0 10px rgba(124, 92, 255, 0.2);
+    }
+
+    /* ===== Rotation UI (Canvas 2D Sphere Gizmo) ===== */
+    .rotation-ui-container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .rotation-canvas {
+      display: block;
+      border-radius: 50%;
+      cursor: grab;
+      touch-action: none; /* Prevent browser scroll on touch drag */
+      /* サイズは JS (_resizeCanvas) で style.width/height を明示設定する */
+    }
+
+    .rotation-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* ===== Rotation State Display ===== */
+    .rotation-display {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .rotation-values {
+      display: flex;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .rotation-value {
+      min-width: 70px;
+    }
+
+    /* ===== Decode Mode Selector ===== */
+    .decode-mode-selector {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .mode-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      min-height: 44px;
+    }
+    .mode-btn:hover:not(:disabled) {
+      background: var(--color-bg-hover);
+      border-color: var(--color-accent);
+    }
+    .mode-btn-active {
+      background: rgba(124, 92, 255, 0.2);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+    .mode-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* ===== Roll Control ===== */
+    .roll-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      justify-content: center;
+    }
+    .roll-slider-container {
+      flex: 1;
+      max-width: 200px;
+    }
+    .roll-slider-container[hidden] {
+      display: none;
+    }
+    .roll-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: transparent;
+      cursor: pointer;
+      min-height: 44px;
+      padding: 18px 0;
+    }
+    .roll-slider::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+    }
+    .roll-slider::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+      border: none;
+    }
+    .roll-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      margin-top: -5px;
+      cursor: pointer;
+    }
+    .roll-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ===== Progress Bar ===== */
+    .progress-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-bar {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background: transparent;
+      cursor: pointer;
+      min-height: 44px;
+      padding: 18px 0;
+    }
+
+    .progress-bar::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      background: var(--color-slider-track);
+      border-radius: 4px;
+    }
+
+    .progress-bar::-moz-range-track {
+      width: 100%;
+      height: 8px;
+      background: var(--color-slider-track);
+      border-radius: 4px;
+      border: none;
+    }
+
+    .progress-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      margin-top: -4px;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(124, 92, 255, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .progress-bar::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(124, 92, 255, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .progress-bar::-webkit-slider-thumb:hover {
+      transform: scale(1.3);
+      box-shadow: 0 0 14px rgba(124, 92, 255, 0.6);
+    }
+
+    .progress-bar::-moz-range-thumb:hover {
+      transform: scale(1.3);
+      box-shadow: 0 0 14px rgba(124, 92, 255, 0.6);
+    }
+
+    /* Disabled (unloaded) state for the seek/progress bar (要件 10.8) */
+    .progress-bar:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .time-display {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== Share Button ===== */
+    .share-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .share-btn {
+      padding: 10px 20px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-input);
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast),
+                  border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .share-btn:hover {
+      background: var(--color-bg-hover);
+      color: var(--color-text);
+      border-color: var(--color-accent);
+    }
+
+    .share-btn:active {
+      transform: scale(0.97);
+    }
+
+    .share-description {
+      margin: 6px 0 0;
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ===== Keyboard Shortcuts Help ===== */
+    .shortcuts-help {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 12px 16px 24px;
+      text-align: center;
+    }
+
+    .shortcuts-toggle {
+      padding: 8px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .shortcuts-toggle:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-muted);
+    }
+
+    .shortcuts-list {
+      margin: 12px auto 0;
+      padding: 16px;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      display: inline-flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .shortcuts-list[hidden] {
+      display: none;
+    }
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .shortcut-item dt {
+      min-width: 60px;
+    }
+
+    .shortcut-item dd {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 3px 8px;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.78rem;
+      color: var(--color-text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ===== Mobile Responsive (≤768px) ===== */
+    @media (max-width: 768px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      /* Reorder: Center, Track */
+      .center-panel { order: 1; }
+      #track-a { order: 2; }
+
+      header h1 {
+        font-size: 1.25rem;
+      }
+
+      .track-panel {
+        padding: 16px;
+      }
+
+      .center-panel {
+        padding: 20px 16px;
+        gap: 20px;
+      }
+
+      .waveform-canvas {
+        height: 60px;
+      }
+
+      .transport-btn {
+        padding: 12px 20px;
+        font-size: 0.85rem;
+      }
+
+      .shortcuts-help {
+        padding: 8px 12px 20px;
+      }
+    }
+
+    /* ===== Small Mobile (≤480px) ===== */
+    @media (max-width: 480px) {
+      .track-url-controls {
+        flex-direction: column;
+      }
+
+      .load-btn {
+        width: 100%;
+      }
+
+      .transport-controls {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .transport-btn {
+        width: 100%;
+      }
+
+      .decode-mode-selector {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .mode-btn {
+        width: 100%;
+      }
+
+      .roll-control {
+        flex-direction: column;
+      }
+
+      .roll-slider-container {
+        max-width: 100%;
+        width: 100%;
+      }
+    }
+
+    /* ===== Focus Styles for Accessibility ===== */
+    :focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    input[type="range"]:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 4px;
+    }
+
+    /* ===== Reduced Motion ===== */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AmbisonicsPlayer</h1>
+    <a id="readme-link" class="readme-link" href="https://github.com/" target="_blank" rel="noopener noreferrer" aria-label="使い方・ドキュメントを開く">📖 使い方</a>
+  </header>
+
+  <main class="app-container">
+    <!-- Track (Left Panel) -->
+    <section id="track-a" class="track-panel" aria-label="トラック">
+      <h2 class="track-title">トラック</h2>
+
+      <div class="track-source-status" id="source-status-a">
+        <span class="source-status-text">音源が読み込まれていません</span>
+        <button class="source-clear-btn" id="clear-a" hidden aria-label="音源をクリア">✕</button>
+      </div>
+      <div id="format-info" class="format-info" hidden>
+        <span id="format-info-text"></span>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">🌐 ネットワーク</span>
+        <div class="track-url-controls">
+          <label for="url-a" class="visually-hidden">音源URL</label>
+          <input
+            type="text"
+            id="url-a"
+            class="url-input"
+            placeholder="音源URLを入力..."
+            aria-label="音源のURL入力"
+          />
+          <button id="load-a" class="load-btn" aria-label="URLから読み込む">読込</button>
+        </div>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">📁 ローカル</span>
+        <div class="track-file-controls">
+          <button id="file-a" class="file-select-btn" aria-label="ローカルファイルを選択またはドロップ">ファイルを選択 / ドロップ</button>
+          <input type="file" id="file-input-a" class="file-input-hidden" accept="audio/*,.wav,.mp3,.flac,.ogg" />
+        </div>
+      </div>
+
+      <div id="loading-a" class="loading-indicator" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>読み込み中...</span>
+      </div>
+
+      <div id="error-a" class="error-display" hidden role="alert" aria-live="assertive"></div>
+
+      <div id="info-a" class="track-info" aria-label="音源情報">
+        <span class="track-name"></span>
+        <span class="track-duration"></span>
+      </div>
+
+      <div id="warning-a" class="track-warning" hidden>⚠ 互換モードで動作中: 波形表示とAmbisonics回転処理は利用できません</div>
+
+      <canvas id="waveform-a" class="waveform-canvas" width="300" height="100" aria-label="波形表示"></canvas>
+
+      <div class="volume-control">
+        <label for="volume-a">音量</label>
+        <input
+          type="range"
+          id="volume-a"
+          class="volume-slider"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+          aria-label="音量"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="1"
+        />
+      </div>
+    </section>
+
+    <!-- Center Panel (初期状態では非表示。音源読み込み+AudioWorklet初期化成功で表示) -->
+    <section class="center-panel" id="center-panel" aria-label="再生コントロール" hidden>
+      <!-- Rotation UI (Canvas 2D Sphere Gizmo) -->
+      <div class="rotation-ui-container" id="rotation-ui-container">
+        <canvas id="rotation-canvas" class="rotation-canvas" width="300" height="300" aria-label="回転操作"></canvas>
+      </div>
+
+      <!-- Transport Controls -->
+      <div class="transport-controls" role="group" aria-label="トランスポートコントロール">
+        <button id="seek-start-btn" class="transport-btn" aria-label="先頭に戻る">
+          ⏮ 先頭
+        </button>
+        <button id="play-btn" class="transport-btn" disabled aria-label="再生/停止">
+          ▶ 再生
+        </button>
+        <button id="loop-btn" class="transport-btn" aria-label="ループ再生の切り替え" aria-pressed="false">
+          🔁 ループ
+        </button>
+      </div>
+
+      <!-- Rotation State Display -->
+      <div class="rotation-display" role="group" aria-label="回転状態">
+        <div class="rotation-values">
+          <span class="rotation-value" id="yaw-display">Yaw: 0°</span>
+          <span class="rotation-value" id="pitch-display">Pitch: 0°</span>
+          <span class="rotation-value" id="roll-display">Roll: 0°</span>
+        </div>
+        <button id="rotation-reset-btn" class="transport-btn" aria-label="回転をリセット">
+          ↺ リセット
+        </button>
+      </div>
+
+      <!-- Roll Control -->
+      <div class="roll-control" id="roll-control">
+        <button id="roll-toggle-btn" class="transport-btn" aria-label="Roll操作の有効/無効" aria-pressed="false">
+          Roll
+        </button>
+        <div id="roll-slider-container" class="roll-slider-container" hidden>
+          <input type="range" id="roll-slider" class="roll-slider" min="0" max="359" step="1" value="0" aria-label="Roll角" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" />
+        </div>
+      </div>
+
+      <!-- Decode Mode Selector -->
+      <div class="decode-mode-selector" role="radiogroup" aria-label="デコードモード">
+        <button id="mode-stereo" class="mode-btn" role="radio" aria-checked="false">ステレオ</button>
+        <button id="mode-binaural" class="mode-btn mode-btn-active" role="radio" aria-checked="true">バイノーラル</button>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-container" role="group" aria-label="再生進捗">
+        <input
+          type="range"
+          id="progress-bar"
+          class="progress-bar"
+          min="0"
+          max="100"
+          step="0.1"
+          value="0"
+          aria-label="再生位置"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        />
+        <div id="time-display" class="time-display" aria-live="off">
+          <span class="current-time">0:00</span>
+          <span class="time-separator">/</span>
+          <span class="total-time">0:00</span>
+        </div>
+      </div>
+
+      <!-- Share Button -->
+      <div class="share-container">
+        <button id="share-btn" class="share-btn" aria-label="現在の音源設定を含む共有用URLをクリップボードにコピー" title="現在読み込んでいる音源の組み合わせを、他の人にも同じ状態で開けるURLとしてコピーします">
+          🔗 共有用URLをコピー
+        </button>
+        <p class="share-description">現在の音源込みで共有できるURLをクリップボードにコピーします</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Keyboard Shortcuts Help -->
+  <aside id="shortcuts-help" class="shortcuts-help" aria-label="キーボードショートカット">
+    <button class="shortcuts-toggle" aria-expanded="false" aria-controls="shortcuts-list">
+      ⌨ キーボードショートカット
+    </button>
+    <dl id="shortcuts-list" class="shortcuts-list" hidden>
+      <div class="shortcut-item">
+        <dt><kbd>Space</kbd></dt>
+        <dd>再生 / 停止</dd>
+      </div>
+    </dl>
+  </aside>
+
+  <footer class="app-footer">
+    <p>MIT License &copy; 2026 Kagoiri</p>
+  </footer>
+
+  <script>
+    // ============================================================
+    // AmbiMath — 純粋ロジック名前空間
+    // ============================================================
+    // Canonical source: src/ambi-math.mjs — keep in sync
+    // テスト可能な副作用のない純粋関数をここに集約する。
+    window.AmbiMath = Object.create(null);
+
+    // --- Task 2.1: 角度正規化関数 ---
+    window.AmbiMath.normalizeAngle360 = function normalizeAngle360(deg) {
+      if (!isFinite(deg)) return 0;
+      const result = deg % 360;
+      return result < 0 ? result + 360 : result;
+    };
+
+    window.AmbiMath.normalizePitch = function normalizePitch(deg) {
+      if (!isFinite(deg)) return 0;
+      return Math.max(-90, Math.min(90, deg));
+    };
+
+    // --- Task 2.4: 表示用角度丸め ---
+    window.AmbiMath.roundAngleForDisplay = function roundAngleForDisplay(deg, axis) {
+      if (axis === 'pitch') {
+        return Math.round(window.AmbiMath.normalizePitch(deg));
+      }
+      return Math.round(window.AmbiMath.normalizeAngle360(deg)) % 360;
+    };
+
+    // --- Task 2.6: ジェスチャー分類と軸別デルタ適用 ---
+    window.AmbiMath.classifyGesture = function classifyGesture(dx, dy, threshold = 5) {
+      if (Math.hypot(dx, dy) < threshold) {
+        return 'none';
+      }
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      if (absDx > absDy) return 'horizontal';
+      if (absDy > absDx) return 'vertical';
+      return 'horizontal';
+    };
+
+    window.AmbiMath.applyYawDelta = function applyYawDelta(currentYaw, dxPixels, sensitivity = 0.5) {
+      return window.AmbiMath.normalizeAngle360(currentYaw + dxPixels * sensitivity);
+    };
+
+    window.AmbiMath.applyPitchDelta = function applyPitchDelta(currentPitch, dyPixels, sensitivity = 0.5) {
+      return window.AmbiMath.normalizePitch(currentPitch + dyPixels * sensitivity);
+    };
+
+    // --- Task 2.9: クランプ・整形関数 ---
+    window.AmbiMath.clampVolume = function clampVolume(v) {
+      if (!isFinite(v)) return 0;
+      return Math.max(0, Math.min(1, v));
+    };
+
+    window.AmbiMath.clampSeek = function clampSeek(position, duration) {
+      if (!isFinite(position)) position = 0;
+      if (!isFinite(duration) || duration < 0) duration = 0;
+      return Math.max(0, Math.min(duration, position));
+    };
+
+    window.AmbiMath.formatTime = function formatTime(seconds) {
+      if (!isFinite(seconds) || seconds < 0) seconds = 0;
+      const totalSec = Math.floor(seconds);
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    };
+
+    window.AmbiMath.calculatePositionFromClick = function calculatePositionFromClick(canvasWidth, canvasOffsetLeft, clientX) {
+      if (!isFinite(canvasWidth) || canvasWidth <= 0) return 0;
+      if (!isFinite(canvasOffsetLeft)) canvasOffsetLeft = 0;
+      if (!isFinite(clientX)) return 0;
+      const position = (clientX - canvasOffsetLeft) / canvasWidth;
+      return Math.max(0, Math.min(1, position));
+    };
+
+    // --- Task 3.1: 座標回転行列 R3 の生成と恒等判定 ---
+    window.AmbiMath.buildR3 = function buildR3(yawDeg, pitchDeg, rollDeg) {
+      const DEG2RAD = Math.PI / 180;
+      const a = yawDeg * DEG2RAD;
+      const b = pitchDeg * DEG2RAD;
+      const c = rollDeg * DEG2RAD;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const cb = Math.cos(b), sb = Math.sin(b);
+      const cc = Math.cos(c), sc = Math.sin(c);
+      const out = new Float64Array(9);
+      out[0] = ca * cb;
+      out[1] = ca * sb * sc - sa * cc;
+      out[2] = ca * sb * cc + sa * sc;
+      out[3] = sa * cb;
+      out[4] = sa * sb * sc + ca * cc;
+      out[5] = sa * sb * cc - ca * sc;
+      out[6] = -sb;
+      out[7] = cb * sc;
+      out[8] = cb * cc;
+      return out;
+    };
+
+    window.AmbiMath.isIdentityRotation = function isIdentityRotation(yawDeg, pitchDeg, rollDeg, tolerance = 1e-10) {
+      let yaw = yawDeg % 360;
+      if (yaw < 0) yaw += 360;
+      const yawZero = yaw <= tolerance || yaw >= 360 - tolerance;
+      let roll = rollDeg % 360;
+      if (roll < 0) roll += 360;
+      const rollZero = roll <= tolerance || roll >= 360 - tolerance;
+      const pitchZero = Math.abs(pitchDeg) <= tolerance;
+      return yawZero && pitchZero && rollZero;
+    };
+
+    // --- Task 3.2: 球面調和回転行列 buildRotationMatrix ---
+    window.AmbiMath.buildRotationMatrix = function buildRotationMatrix(order, yawDeg, pitchDeg, rollDeg) {
+      const N = (order + 1) * (order + 1);
+      if (window.AmbiMath.isIdentityRotation(yawDeg, pitchDeg, rollDeg)) {
+        const M = new Float64Array(N * N);
+        for (let i = 0; i < N; i++) M[i * N + i] = 1;
+        return M;
+      }
+      const R3 = window.AmbiMath.buildR3(yawDeg, pitchDeg, rollDeg);
+      // M_1 with Condon-Shortley phase (Ivanic & Ruedenberg Appendix 1)
+      const R1 = new Float64Array(9);
+      R1[0] = R3[4];   R1[1] = -R3[5];  R1[2] = R3[3];
+      R1[3] = -R3[7];  R1[4] = R3[8];   R1[5] = -R3[6];
+      R1[6] = R3[1];   R1[7] = -R3[2];  R1[8] = R3[0];
+
+      function getCE(mat, size, i, j) {
+        const off = (size - 1) / 2;
+        return mat[(i + off) * size + (j + off)];
+      }
+      function P(i, a, b, l, degs) {
+        const prevSize = 2*(l-1)+1;
+        if (b === l) {
+          return getCE(degs[1],3,i,1)*getCE(degs[l-1],prevSize,a,l-1) -
+                 getCE(degs[1],3,i,-1)*getCE(degs[l-1],prevSize,a,-l+1);
+        } else if (b === -l) {
+          return getCE(degs[1],3,i,1)*getCE(degs[l-1],prevSize,a,-l+1) +
+                 getCE(degs[1],3,i,-1)*getCE(degs[l-1],prevSize,a,l-1);
+        } else {
+          return getCE(degs[1],3,i,0)*getCE(degs[l-1],prevSize,a,b);
+        }
+      }
+      function U(m,n,l,degs) { return P(0,m,n,l,degs); }
+      function V(m,n,l,degs) {
+        if (m===0) return P(1,1,n,l,degs)+P(-1,-1,n,l,degs);
+        if (m>0) {
+          const d=(m===1)?1:0;
+          return P(1,m-1,n,l,degs)*Math.sqrt(1+d) - P(-1,-m+1,n,l,degs)*(1-d);
+        }
+        const d=(m===-1)?1:0;
+        return P(1,m+1,n,l,degs)*(1-d) + P(-1,-m-1,n,l,degs)*Math.sqrt(1+d);
+      }
+      function W(m,n,l,degs) {
+        if (m===0) return 0;
+        if (m>0) return P(1,m+1,n,l,degs)+P(-1,-m-1,n,l,degs);
+        return P(1,m-1,n,l,degs)-P(-1,-m+1,n,l,degs);
+      }
+      function uvw(m,n,l) {
+        const d=(m===0)?1:0, absM=Math.abs(m), absN=Math.abs(n);
+        const denom=(absN===l)?(2*l)*(2*l-1):(l+n)*(l-n);
+        const u=Math.sqrt((l+m)*(l-m)/denom);
+        const v=0.5*Math.sqrt((1+d)*(l+absM-1)*(l+absM)/denom)*(1-2*d);
+        const w=-0.5*Math.sqrt((l-absM-1)*(l-absM)/denom)*(1-d);
+        return [u,v,w];
+      }
+      const degrees = [];
+      degrees[0] = new Float64Array([1]);
+      degrees[1] = R1;
+      for (let l = 2; l <= order; l++) {
+        const size = 2*l+1;
+        const Rl = new Float64Array(size*size);
+        for (let m=-l; m<=l; m++) {
+          for (let n=-l; n<=l; n++) {
+            let [u,v,w] = uvw(m,n,l);
+            if (Math.abs(u)>1e-15) u*=U(m,n,l,degrees); else u=0;
+            if (Math.abs(v)>1e-15) v*=V(m,n,l,degrees); else v=0;
+            if (Math.abs(w)>1e-15) w*=W(m,n,l,degrees); else w=0;
+            Rl[(m+l)*size+(n+l)] = u+v+w;
+          }
+        }
+        degrees[l] = Rl;
+      }
+      const M = new Float64Array(N * N);
+      let offset = 0;
+      for (let l = 0; l <= order; l++) {
+        const size = 2*l+1;
+        const Rl = degrees[l];
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            M[(offset+i)*N + (offset+j)] = Rl[i*size + j];
+          }
+        }
+        offset += size;
+      }
+      return M;
+    };
+
+    // --- Task 3.6: ステレオデコード行列 ---
+    window.AmbiMath.buildStereoDecodeMatrix = function buildStereoDecodeMatrix(order) {
+      const N = (order + 1) * (order + 1);
+      const D = new Float64Array(2 * N);
+      D[0] = 0.5; D[N] = 0.5;
+      D[1] = 0.5; D[N + 1] = -0.5;
+      if (order >= 2) { D[8] = 0.25; D[N + 8] = -0.25; }
+      if (order >= 3) { D[15] = 0.125; D[N + 15] = -0.125; }
+      return D;
+    };
+
+    // --- Task 7.1: FormatDetector ---
+    window.AmbiMath.channelsToOrder = function channelsToOrder(n) {
+      if (n === 4) return 1;
+      if (n === 9) return 2;
+      if (n === 16) return 3;
+      return null;
+    };
+
+    window.AmbiMath.isValidAmbisonicsChannelCount = function isValidAmbisonicsChannelCount(n) {
+      return n === 4 || n === 9 || n === 16;
+    };
+
+    window.AmbiMath.detectFormat = function detectFormat(numberOfChannels, metadataHint) {
+      const order = window.AmbiMath.channelsToOrder(numberOfChannels);
+      if (order === null) return null;
+      let format = 'ambix';
+      if (typeof metadataHint === 'string') {
+        const hint = metadataHint.toLowerCase();
+        if (hint.includes('fuma') || hint.endsWith('.amb')) {
+          format = 'fuma';
+        }
+      }
+      return { format, order, channelCount: numberOfChannels };
+    };
+
+    // --- Task 7.3: フォーマット表示文字列 ---
+    window.AmbiMath.formatInfoToDisplay = function formatInfoToDisplay(info) {
+      if (info == null) return '';
+      const formatName = info.format === 'fuma' ? 'FuMa' : 'AmbiX';
+      const orderStr = info.order + '次';
+      return formatName + ' ' + orderStr + ' (' + info.channelCount + 'ch)';
+    };
+
+    // --- Task 7.5: pickFirstFile / convertDropboxUrl ---
+    window.AmbiMath.pickFirstFile = function pickFirstFile(files) {
+      if (files && files.length > 0) return files[0];
+      return null;
+    };
+
+    window.AmbiMath.convertDropboxUrl = function convertDropboxUrl(url) {
+      const originalUrl = url;
+      if (/^https?:\/\/(www\.)?dropbox\.com\//i.test(url)) {
+        try {
+          const urlObj = new URL(url);
+          urlObj.hostname = 'dl.dropboxusercontent.com';
+          urlObj.searchParams.delete('dl');
+          const converted = urlObj.toString();
+          return { converted, isConverted: converted !== url, originalUrl };
+        } catch {
+          return { converted: url, isConverted: false, originalUrl };
+        }
+      }
+      return { converted: url, isConverted: false, originalUrl };
+    };
+
+    // --- Task 4.1: FormatConverter (AmbiX↔FuMa 変換) ---
+    (function() {
+      const FUMA2AMBIX_PERM = [
+        0,
+        2, 3, 1,
+        8, 6, 4, 5, 7,
+        15, 13, 11, 9, 10, 12, 14,
+      ];
+
+      const FUMA2SN3D_FACTORS = [
+        Math.sqrt(2),
+        Math.sqrt(3), Math.sqrt(3), Math.sqrt(3),
+        Math.sqrt(5), Math.sqrt(5), 1, Math.sqrt(5), Math.sqrt(5),
+        Math.sqrt(35 / 8), Math.sqrt(7), Math.sqrt(21 / 5), 1, Math.sqrt(21 / 5), Math.sqrt(7), Math.sqrt(35 / 8),
+      ];
+
+      window.AmbiMath.getPermutation = function getPermutation(order, direction) {
+        const N = (order + 1) * (order + 1);
+        const fwd = FUMA2AMBIX_PERM.slice(0, N);
+        if (direction === 'fuma2ambix') return fwd;
+        const inv = new Array(N);
+        for (let acn = 0; acn < N; acn++) inv[fwd[acn]] = acn;
+        return inv;
+      };
+
+      window.AmbiMath.getNormFactors = function getNormFactors(order, direction) {
+        const N = (order + 1) * (order + 1);
+        const fwd = FUMA2SN3D_FACTORS.slice(0, N);
+        if (direction === 'fuma2ambix') return fwd;
+        return fwd.map(c => 1 / c);
+      };
+
+      window.AmbiMath.fumaToAmbix = function fumaToAmbix(channels, order) {
+        const N = (order + 1) * (order + 1);
+        const perm = window.AmbiMath.getPermutation(order, 'fuma2ambix');
+        const factors = window.AmbiMath.getNormFactors(order, 'fuma2ambix');
+        const result = new Array(N);
+        for (let acn = 0; acn < N; acn++) {
+          const src = channels[perm[acn]];
+          const len = src.length;
+          const dst = new Float32Array(len);
+          const f = factors[acn];
+          for (let i = 0; i < len; i++) dst[i] = f * src[i];
+          result[acn] = dst;
+        }
+        return result;
+      };
+
+      window.AmbiMath.ambixToFuma = function ambixToFuma(channels, order) {
+        const N = (order + 1) * (order + 1);
+        const perm = window.AmbiMath.getPermutation(order, 'ambix2fuma');
+        const factors = window.AmbiMath.getNormFactors(order, 'ambix2fuma');
+        const result = new Array(N);
+        for (let fumaIdx = 0; fumaIdx < N; fumaIdx++) {
+          const acn = perm[fumaIdx];
+          const src = channels[acn];
+          const len = src.length;
+          const dst = new Float32Array(len);
+          const f = factors[acn];
+          for (let i = 0; i < len; i++) dst[i] = f * src[i];
+          result[fumaIdx] = dst;
+        }
+        return result;
+      };
+
+      // --- Task 5.1: WAV エンコーダ encodeWavPCM ---
+      function _writeString(view, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      window.AmbiMath.encodeWavPCM = function encodeWavPCM(channels, sampleRate, bitDepth = 16) {
+        const numChannels = channels.length;
+        const numSamples = numChannels > 0 ? channels[0].length : 0;
+        const bytesPerSample = bitDepth / 8;
+        const blockAlign = numChannels * bytesPerSample;
+        const dataSize = numSamples * blockAlign;
+        const audioFormat = bitDepth === 32 ? 3 : 1;
+
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        // RIFF header
+        _writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        _writeString(view, 8, 'WAVE');
+
+        // fmt sub-chunk
+        _writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, audioFormat, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bitDepth, true);
+
+        // data sub-chunk
+        _writeString(view, 36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        // Write interleaved samples
+        let offset = 44;
+        for (let i = 0; i < numSamples; i++) {
+          for (let ch = 0; ch < numChannels; ch++) {
+            const sample = channels[ch][i];
+            if (bitDepth === 16) {
+              const clamped = Math.max(-1, Math.min(1, sample));
+              const int16 = Math.round(clamped * 32767);
+              view.setInt16(offset, int16, true);
+              offset += 2;
+            } else {
+              view.setFloat32(offset, sample, true);
+              offset += 4;
+            }
+          }
+        }
+
+        return buffer;
+      };
+    })();
+
+    // --- Task 6.1: 共有 URL スキーマ (generateShareUrl / parseShareUrl) ---
+    (function() {
+      const SHARE_DEFAULTS = {
+        yaw: 0, pitch: 0, roll: 0,
+        rollToggle: false,
+        mode: 'binaural',
+        autoplay: false,
+        loop: false,
+      };
+
+      window.AmbiMath.SHARE_DEFAULTS = SHARE_DEFAULTS;
+
+      window.AmbiMath.generateShareUrl = function generateShareUrl(state, baseUrl) {
+        const base = baseUrl !== undefined ? baseUrl : window.location.origin + window.location.pathname;
+        const url = new URL(base);
+
+        if (state.src) {
+          url.searchParams.set('src', state.src);
+        }
+
+        const yaw = Math.round(window.AmbiMath.normalizeAngle360(state.yaw || 0)) % 360;
+        if (yaw !== SHARE_DEFAULTS.yaw) {
+          url.searchParams.set('yaw', String(yaw));
+        }
+
+        const pitch = Math.round(window.AmbiMath.normalizePitch(state.pitch || 0));
+        if (pitch !== SHARE_DEFAULTS.pitch) {
+          url.searchParams.set('pitch', String(pitch));
+        }
+
+        const roll = Math.round(window.AmbiMath.normalizeAngle360(state.roll || 0)) % 360;
+        if (roll !== SHARE_DEFAULTS.roll) {
+          url.searchParams.set('roll', String(roll));
+        }
+
+        if (state.rollToggle) {
+          url.searchParams.set('rolltoggle', '1');
+        }
+
+        const mode = (state.mode === 'binaural') ? 'binaural' : 'stereo';
+        if (mode !== SHARE_DEFAULTS.mode) {
+          url.searchParams.set('mode', mode);
+        }
+
+        if (state.autoplay) {
+          url.searchParams.set('autoplay', '1');
+        }
+
+        if (state.loop) {
+          url.searchParams.set('loop', '1');
+        }
+
+        return url.toString();
+      };
+
+      window.AmbiMath.parseShareUrl = function parseShareUrl(urlString) {
+        const url = new URL(urlString);
+        const params = url.searchParams;
+
+        const src = params.get('src') || null;
+
+        let yaw = SHARE_DEFAULTS.yaw;
+        if (params.has('yaw')) {
+          const parsed = parseInt(params.get('yaw'), 10);
+          yaw = isFinite(parsed) ? Math.round(window.AmbiMath.normalizeAngle360(parsed)) % 360 : SHARE_DEFAULTS.yaw;
+        }
+
+        let pitch = SHARE_DEFAULTS.pitch;
+        if (params.has('pitch')) {
+          const parsed = parseInt(params.get('pitch'), 10);
+          pitch = isFinite(parsed) ? Math.round(window.AmbiMath.normalizePitch(parsed)) : SHARE_DEFAULTS.pitch;
+        }
+
+        let roll = SHARE_DEFAULTS.roll;
+        if (params.has('roll')) {
+          const parsed = parseInt(params.get('roll'), 10);
+          roll = isFinite(parsed) ? Math.round(window.AmbiMath.normalizeAngle360(parsed)) % 360 : SHARE_DEFAULTS.roll;
+        }
+
+        const rollToggle = params.get('rolltoggle') === '1';
+        const modeRaw = params.get('mode');
+        const mode = modeRaw === 'stereo' ? 'stereo' : 'binaural'; // default: binaural
+        const autoplay = params.get('autoplay') === '1';
+        const loop = params.get('loop') === '1';
+
+        return { src, yaw, pitch, roll, rollToggle, mode, autoplay, loop };
+      };
+    })();
+
+    // --- Task 15.2: BinauralRenderer — HRTF 検証と整形 ---
+    window.AmbiMath.validateHRTF = function validateHRTF(data, order) {
+      try {
+        if (data == null || typeof data !== 'object') return false;
+        if (!data.hrir || typeof data.hrir !== 'object') return false;
+        const requiredChannels = (order + 1) * (order + 1);
+        if (!Array.isArray(data.hrir.left) || !Array.isArray(data.hrir.right)) return false;
+        if (typeof data.channels === 'number') {
+          if (data.channels < requiredChannels) return false;
+        } else if (typeof data.order === 'number') {
+          if (data.order < order) return false;
+        } else {
+          return false;
+        }
+        if (data.hrir.left.length < requiredChannels) return false;
+        if (data.hrir.right.length < requiredChannels) return false;
+        if (typeof data.firLength !== 'number' || !Number.isInteger(data.firLength) || data.firLength <= 0) return false;
+        const firLen = data.firLength;
+        for (let i = 0; i < requiredChannels; i++) {
+          const left = data.hrir.left[i];
+          const right = data.hrir.right[i];
+          if (!Array.isArray(left) && !(left instanceof Float32Array) && !(left instanceof Float64Array)) return false;
+          if (!Array.isArray(right) && !(right instanceof Float32Array) && !(right instanceof Float64Array)) return false;
+          if (left.length !== firLen) return false;
+          if (right.length !== firLen) return false;
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    window.AmbiMath.toWorkletPayload = function toWorkletPayload(data, order) {
+      const N = (order + 1) * (order + 1);
+      const firLength = data.firLength;
+      const left = new Array(N);
+      const right = new Array(N);
+      for (let i = 0; i < N; i++) {
+        left[i] = new Float32Array(data.hrir.left[i]);
+        right[i] = new Float32Array(data.hrir.right[i]);
+      }
+      return { left, right, firLength };
+    };
+
+    // --- Task 16.1: applyRotationToBuffer ---
+    window.AmbiMath.applyRotationToBuffer = function applyRotationToBuffer(channels, rotationMatrix, order) {
+      const N = (order + 1) * (order + 1);
+      const numSamples = channels[0].length;
+      const result = new Array(N);
+      for (let ch = 0; ch < N; ch++) {
+        result[ch] = new Float32Array(numSamples);
+      }
+
+      for (let s = 0; s < numSamples; s++) {
+        for (let i = 0; i < N; i++) {
+          let sum = 0;
+          for (let j = 0; j < N; j++) {
+            sum += rotationMatrix[i * N + j] * channels[j][s];
+          }
+          result[i][s] = sum;
+        }
+      }
+
+      return result;
+    };
+
+    // ============================================================
+    // Inlined Modules (from src/*.js - adapted for inline use)
+    // ============================================================
+
+    // --- audio-math.js ---
+    // NOTE(task 10.2): 単一トラック化に伴い、クロスフェード計算
+    //   (calculateCrossfadeGains / calculateFinalVolume / clampCrossfaderValue) を削除した。
+    //   音量クランプ [0,1] は AudioEngine.setVolume 内でインライン実装する
+    //   (純粋関数 clampVolume の正式化は task 2)。
+
+    // --- url-converter.js ---
+    const URLConverter = {
+      convert(url) {
+        return window.AmbiMath.convertDropboxUrl(url);
+      },
+      isDropboxUrl(url) {
+        return /^https?:\/\/(www\.)?dropbox\.com\//i.test(url);
+      },
+    };
+
+    // --- share-manager.js ---
+    // NOTE(task 6.1): 新しい共有 URL スキーマ
+    //   (src/yaw/pitch/roll/rolltoggle/mode/autoplay/loop) を完全実装。
+    //   純粋関数 generateShareUrl / parseShareUrl は AmbiMath に委譲する。
+    const ShareManager = {
+      getUrlParams(urlString) {
+        const href = urlString !== undefined ? urlString : window.location.href;
+        return window.AmbiMath.parseShareUrl(href);
+      },
+      generateShareUrl(state, baseUrl) {
+        return window.AmbiMath.generateShareUrl(state, baseUrl);
+      },
+      updateUrl(state) {
+        const url = window.AmbiMath.generateShareUrl(state, window.location.origin + window.location.pathname);
+        window.history.replaceState({}, '', url);
+      },
+      async copyToClipboard(url) {
+        try { await navigator.clipboard.writeText(url); return true; } catch { return false; }
+      },
+    };
+
+    // --- keyboard-handler.js ---
+    // task 10.5: クロスフェード用 ArrowLeft/ArrowRight 割り当てを撤去し、Space による
+    //   再生トグルのみを登録する。登録キー（Space）でのみ preventDefault を呼び、
+    //   未登録キーでは preventDefault を呼ばず再生状態も変更しない（要件 20.3/20.4）。
+    //   テキスト入力要素（input/textarea/select/contenteditable）にフォーカスがある間は
+    //   ショートカットを処理しない（要件 20.2）。音源未読込時に Space を無効化する
+    //   ガード（要件 20.1）は onTogglePlay コールバック（handleTogglePlay）側で行う。
+    const KeyboardHandler = {
+      _handler: null,
+      register(callbacks) {
+        this.unregister();
+        this._handler = (e) => {
+          // 要件 20.2: テキスト入力中はショートカットを処理しない。
+          if (this.isInputFocused()) return;
+          switch (e.code) {
+            // 要件 20.1/20.3: 登録キー Space のみ preventDefault し再生トグルを呼ぶ。
+            case 'Space': {
+              e.preventDefault();
+              callbacks.onTogglePlay();
+              break;
+            }
+            // 要件 20.4: 未登録キーでは preventDefault を呼ばず再生状態も変更しない
+            //   （default で何もしない）。
+          }
+        };
+        document.addEventListener('keydown', this._handler);
+      },
+      isInputFocused() {
+        const activeElement = document.activeElement;
+        if (!activeElement) return false;
+        const tagName = activeElement.tagName.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+        if (activeElement.isContentEditable || activeElement.getAttribute('contenteditable') === 'true') return true;
+        return false;
+      },
+      unregister() {
+        if (this._handler) {
+          document.removeEventListener('keydown', this._handler);
+          this._handler = null;
+        }
+      }
+    };
+
+    // --- waveform-renderer.js ---
+    // Delegates to AmbiMath.calculatePositionFromClick (canonical implementation)
+    function calculatePositionFromClick(canvasWidth, canvasOffsetLeft, clientX) {
+      return window.AmbiMath.calculatePositionFromClick(canvasWidth, canvasOffsetLeft, clientX);
+    }
+
+    function downsampleBuffer(buffer, targetLength) {
+      const channelData = buffer.getChannelData(0);
+      const rawLength = channelData.length;
+      const blockSize = Math.floor(rawLength / targetLength);
+      const result = new Float32Array(targetLength);
+      for (let i = 0; i < targetLength; i++) {
+        const start = i * blockSize;
+        let max = 0;
+        for (let j = 0; j < blockSize; j++) {
+          const abs = Math.abs(channelData[start + j]);
+          if (abs > max) max = abs;
+        }
+        result[i] = max;
+      }
+      return result;
+    }
+
+    class WaveformRenderer {
+      _waveformImageData = null;
+      draw(canvas, buffer) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, width, height);
+        const waveformData = downsampleBuffer(buffer, width);
+        const centerY = height / 2;
+        ctx.fillStyle = '#00d4ff';
+        for (let i = 0; i < width; i++) {
+          const amplitude = waveformData[i];
+          const barHeight = amplitude * height * 0.8;
+          const y = centerY - barHeight / 2;
+          ctx.fillRect(i, y, 1, barHeight);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        this._waveformImageData = ctx.getImageData(0, 0, width, height);
+      }
+      updatePlayhead(canvas, progress) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        if (this._waveformImageData) {
+          ctx.putImageData(this._waveformImageData, 0, 0);
+        }
+        const clampedProgress = Math.max(0, Math.min(1, progress));
+        const x = clampedProgress * width;
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      getPositionFromClick(canvas, clientX) {
+        const rect = canvas.getBoundingClientRect();
+        return calculatePositionFromClick(rect.width, rect.left, clientX);
+      }
+    }
+
+    // --- audio-engine.js ---
+    const AudioErrorType = {
+      INVALID_URL: 'INVALID_URL',
+      NETWORK_ERROR: 'NETWORK_ERROR',
+      CORS_ERROR: 'CORS_ERROR',
+      DECODE_ERROR: 'DECODE_ERROR',
+      CONVERTED_URL_ERROR: 'CONVERTED_URL_ERROR',
+      AUDIO_CONTEXT_ERROR: 'AUDIO_CONTEXT_ERROR',
+      GOOGLE_DRIVE_UNSUPPORTED: 'GOOGLE_DRIVE_UNSUPPORTED',
+      UNSUPPORTED_CHANNEL_COUNT: 'UNSUPPORTED_CHANNEL_COUNT',
+      WORKLET_INIT_ERROR: 'WORKLET_INIT_ERROR',
+      HRTF_LOAD_ERROR: 'HRTF_LOAD_ERROR',
+      EXPORT_ERROR: 'EXPORT_ERROR',
+      EXPORT_NO_SOURCE: 'EXPORT_NO_SOURCE',
+      EXPORT_INVALID_AMBISONICS: 'EXPORT_INVALID_AMBISONICS',
+    };
+
+    class AudioLoadError extends Error {
+      constructor(type, userMessage, cause) {
+        super(userMessage);
+        this.name = 'AudioLoadError';
+        this.type = type;
+        this.userMessage = userMessage;
+        if (cause) this.cause = cause;
+      }
+    }
+
+    function createLoadError(type, options) {
+      options = options || {};
+      const { originalUrl, convertedUrl, detail, cause } = options;
+      switch (type) {
+        case AudioErrorType.INVALID_URL:
+          return new AudioLoadError(type, '無効なURLです。正しいURLを入力してください。', cause);
+        case AudioErrorType.NETWORK_ERROR:
+          return new AudioLoadError(type, '音源の取得に失敗しました: ' + (detail || '不明なエラー'), cause);
+        case AudioErrorType.CORS_ERROR:
+          return new AudioLoadError(type, '音源の取得が拒否されました。このサーバーはブラウザからの直接アクセスを許可していない可能性があります（CORS制限）。CORSに対応したサーバー上の直接リンクをご利用ください。', cause);
+        case AudioErrorType.DECODE_ERROR:
+          return new AudioLoadError(type, '音源のデコードに失敗しました。対応形式: WAV, MP3, FLAC, OGG', cause);
+        case AudioErrorType.CONVERTED_URL_ERROR:
+          return new AudioLoadError(type, '元のURL: ' + originalUrl + '\n変換後URL: ' + convertedUrl + '\n取得に失敗しました。', cause);
+        case AudioErrorType.AUDIO_CONTEXT_ERROR:
+          return new AudioLoadError(type, 'お使いのブラウザはWeb Audio APIに対応していません。', cause);
+        case AudioErrorType.GOOGLE_DRIVE_UNSUPPORTED:
+          return new AudioLoadError(type, 'Google Driveの共有リンクには対応していません。Dropboxや、CORSに対応したサーバー上の直接リンクをご利用ください。', cause);
+        case AudioErrorType.UNSUPPORTED_CHANNEL_COUNT:
+          return new AudioLoadError(type, '対応していないチャンネル数です（4・9・16chのAmbisonics音源のみ対応）。', cause);
+        case AudioErrorType.WORKLET_INIT_ERROR:
+          return new AudioLoadError(type, 'Ambisonicsデコードを初期化できませんでした。お使いのブラウザがAudioWorkletに対応していない可能性があります。音声を再生できません。', cause);
+        case AudioErrorType.HRTF_LOAD_ERROR:
+          return new AudioLoadError(type, 'HRTFデータを読み込めませんでした。バイノーラル再生は利用できません（ステレオで再生します）。', cause);
+        case AudioErrorType.EXPORT_ERROR:
+          return new AudioLoadError(type, '書き出しに失敗しました。', cause);
+        case AudioErrorType.EXPORT_NO_SOURCE:
+          return new AudioLoadError(type, '音源が読み込まれていません。書き出しを行うには、まず音源を読み込んでください。', cause);
+        case AudioErrorType.EXPORT_INVALID_AMBISONICS:
+          return new AudioLoadError(type, 'Ambisonicsとして書き出せません（有効なチャンネル数ではありません）。', cause);
+        default:
+          return new AudioLoadError(type, '不明なエラーが発生しました。', cause);
+      }
+    }
+
+    // ============================================================
+    // AudioWorklet プロセッサソース（Blob URL モジュール）
+    // AmbisonicsDecoderProcessor: 回転行列適用 + ステレオ/バイノーラルデコードを
+    // オーディオスレッドで実行する。リアルタイム再生と OfflineAudioContext の
+    // 双方で同一の Blob URL を audioWorklet.addModule() に渡して共有する。
+    // ============================================================
+    const PROCESSOR_SOURCE = `
+class AmbisonicsDecoderProcessor extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    this.order = options.processorOptions.order;        // 1/2/3
+    this.N = options.processorOptions.channelCount;     // 4/9/16
+    this.outputChannels = options.processorOptions.outputChannels || 2; // 2 for playback, N for ambi export
+    this.mode = 'stereo';                               // 'stereo' | 'binaural' | 'identity'
+    this.curMatrix = null;                              // current rotation matrix (N*N flat)
+    this.targetMatrix = null;                           // target rotation matrix
+    this.isIdentity = true;                             // passthrough flag
+    this.transitionAlpha = 1.0;                         // 1.0 = no transition
+    this.transitionSpeed = 0;                           // per-block increment
+    this.stereoMatrix = null;                           // 2*N flat decode matrix
+    this.hrir = null;                                   // { left: Float32Array[], right: Float32Array[], firLength }
+    this.fifoLeft = null;                               // ring buffers for binaural convolution
+    this.fifoRight = null;
+    this.fifoPos = 0;
+    this.port.onmessage = (e) => this._onMessage(e.data);
+  }
+
+  _onMessage(msg) {
+    switch (msg.type) {
+      case 'rotation':
+        this.targetMatrix = msg.matrix;
+        this.isIdentity = msg.isIdentity;
+        if (this.isIdentity) {
+          this.curMatrix = null;
+          this.transitionAlpha = 1.0;
+        } else if (!this.curMatrix) {
+          this.curMatrix = new Float64Array(msg.matrix);
+          this.transitionAlpha = 1.0;
+        } else {
+          this.transitionAlpha = 0;
+          this.transitionSpeed = 1.0 / (0.03 * sampleRate / 128);
+        }
+        break;
+      case 'mode':
+        this.mode = msg.mode;
+        break;
+      case 'stereoMatrix':
+        this.stereoMatrix = msg.matrix;
+        break;
+      case 'hrir':
+        this.hrir = msg;
+        this._initFifo();
+        break;
+    }
+  }
+
+  _initFifo() {
+    if (!this.hrir) return;
+    const L = this.hrir.firLength;
+    this.fifoLeft = new Array(this.N);
+    this.fifoRight = new Array(this.N);
+    for (let ch = 0; ch < this.N; ch++) {
+      this.fifoLeft[ch] = new Float32Array(L);
+      this.fifoRight[ch] = new Float32Array(L);
+    }
+    this.fifoPos = 0;
+  }
+
+  process(inputs, outputs) {
+    const input = inputs[0];
+    const output = outputs[0];
+    if (!input || !input[0] || input[0].length === 0) return true;
+
+    const blockSize = input[0].length;
+    const N = this.N;
+
+    // 1) Apply rotation (or passthrough)
+    let rotated;
+    if (this.isIdentity || !this.curMatrix) {
+      rotated = input;
+    } else {
+      let effMatrix;
+      if (this.transitionAlpha < 1.0 && this.targetMatrix) {
+        this.transitionAlpha = Math.min(1.0, this.transitionAlpha + this.transitionSpeed);
+        if (this.transitionAlpha >= 1.0) {
+          this.curMatrix = new Float64Array(this.targetMatrix);
+          effMatrix = this.curMatrix;
+        } else {
+          effMatrix = new Float64Array(N * N);
+          const a = this.transitionAlpha;
+          for (let i = 0; i < N * N; i++) {
+            effMatrix[i] = this.curMatrix[i] * (1 - a) + this.targetMatrix[i] * a;
+          }
+        }
+      } else {
+        effMatrix = this.curMatrix;
+      }
+
+      rotated = new Array(N);
+      for (let ch = 0; ch < N; ch++) {
+        rotated[ch] = new Float32Array(blockSize);
+      }
+      for (let s = 0; s < blockSize; s++) {
+        for (let i = 0; i < N; i++) {
+          let sum = 0;
+          for (let j = 0; j < N; j++) {
+            sum += effMatrix[i * N + j] * (input[j] ? input[j][s] : 0);
+          }
+          rotated[i][s] = sum;
+        }
+      }
+    }
+
+    // 2) Decode
+    if (this.mode === 'identity') {
+      for (let ch = 0; ch < Math.min(N, output.length); ch++) {
+        if (output[ch] && rotated[ch]) {
+          output[ch].set(rotated[ch]);
+        }
+      }
+    } else if (this.mode === 'stereo' && this.stereoMatrix) {
+      const D = this.stereoMatrix;
+      for (let s = 0; s < blockSize; s++) {
+        let L = 0, R = 0;
+        for (let j = 0; j < N; j++) {
+          const sample = rotated[j] ? (rotated[j][s] || 0) : 0;
+          L += D[j] * sample;
+          R += D[N + j] * sample;
+        }
+        if (output[0]) output[0][s] = L;
+        if (output[1]) output[1][s] = R;
+      }
+    } else if (this.mode === 'binaural' && this.hrir) {
+      const firLen = this.hrir.firLength;
+      for (let s = 0; s < blockSize; s++) {
+        for (let ch = 0; ch < N; ch++) {
+          const sample = rotated[ch] ? (rotated[ch][s] || 0) : 0;
+          this.fifoLeft[ch][this.fifoPos] = sample;
+          this.fifoRight[ch][this.fifoPos] = sample;
+        }
+
+        let sumL = 0, sumR = 0;
+        for (let ch = 0; ch < N; ch++) {
+          const hirL = this.hrir.left[ch];
+          const hirR = this.hrir.right[ch];
+          const fifo = this.fifoLeft[ch];
+          for (let k = 0; k < firLen; k++) {
+            const idx = (this.fifoPos - k + firLen) % firLen;
+            sumL += fifo[idx] * hirL[k];
+            sumR += fifo[idx] * hirR[k];
+          }
+        }
+        if (output[0]) output[0][s] = sumL;
+        if (output[1]) output[1][s] = sumR;
+
+        this.fifoPos = (this.fifoPos + 1) % firLen;
+      }
+    } else {
+      for (let ch = 0; ch < output.length; ch++) {
+        if (output[ch]) output[ch].fill(0);
+      }
+    }
+
+    return true;
+  }
+}
+
+registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
+`;
+
+    const PROCESSOR_BLOB_URL = URL.createObjectURL(
+      new Blob([PROCESSOR_SOURCE], { type: 'application/javascript' })
+    );
+
+    // ============================================================
+    // AmbisonicsDecoder ラッパー（Task 12.1）
+    // AudioWorkletNode を管理し、回転行列・デコードモード・HRTF の
+    // メッセージ送信を抽象化する。
+    // ============================================================
+    class AmbisonicsDecoder {
+      constructor() {
+        this._node = null;
+        this._audioContext = null;
+        this._order = null;
+        this._channelCount = null;
+      }
+
+      async init(audioContext, { order, channelCount }) {
+        this._audioContext = audioContext;
+        this._order = order;
+        this._channelCount = channelCount;
+
+        // Create AudioWorkletNode
+        this._node = new AudioWorkletNode(audioContext, 'ambisonics-decoder-processor', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2], // stereo output for playback
+          channelCount: channelCount,
+          channelCountMode: 'explicit',
+          channelInterpretation: 'discrete',
+          processorOptions: {
+            order: order,
+            channelCount: channelCount,
+            outputChannels: 2,
+            stereoMatrix: Array.from(window.AmbiMath.buildStereoDecodeMatrix(order)),
+          },
+        });
+
+        // Send initial stereo decode matrix
+        this._node.port.postMessage({
+          type: 'stereoMatrix',
+          matrix: window.AmbiMath.buildStereoDecodeMatrix(order),
+        });
+      }
+
+      get node() { return this._node; }
+      get order() { return this._order; }
+      get channelCount() { return this._channelCount; }
+
+      setRotationMatrix(matrixFlat, isIdentity) {
+        if (!this._node) return;
+        this._node.port.postMessage({
+          type: 'rotation',
+          matrix: matrixFlat,
+          isIdentity: isIdentity,
+        });
+      }
+
+      setDecodeMode(mode) {
+        if (!this._node) return;
+        this._node.port.postMessage({ type: 'mode', mode: mode });
+      }
+
+      setBinauralHRTF(payload) {
+        if (!this._node) return;
+        this._node.port.postMessage({
+          type: 'hrir',
+          left: payload.left,
+          right: payload.right,
+          firLength: payload.firLength,
+        });
+      }
+
+      setDecodeIdentity(enabled) {
+        // For Ambisonics export: switch to identity mode (N-ch passthrough with rotation)
+        this.setDecodeMode(enabled ? 'identity' : 'stereo');
+      }
+
+      connectSource(sourceNode) {
+        if (this._node) sourceNode.connect(this._node);
+      }
+
+      connect(destination) {
+        if (this._node) this._node.connect(destination);
+      }
+
+      disconnect() {
+        if (this._node) {
+          try { this._node.disconnect(); } catch {}
+        }
+      }
+
+      dispose() {
+        this.disconnect();
+        this._node = null;
+      }
+    }
+
+    // ============================================================
+    // RotationController（Task 13.1）
+    // 回転状態の管理とジェスチャー入力処理。
+    // 要件 5.2–5.7, 5.8–5.11, 7.2
+    // ============================================================
+    const RotationController = {
+      state: { yaw: 0, pitch: 0, roll: 0, rollToggle: false },
+      _listeners: [],
+      _gesture: null, // { startX, startY, direction: null|'horizontal'|'vertical', lastX, lastY }
+      _sensitivity: 0.5, // degrees per pixel
+
+      beginGesture(x, y) {
+        this._gesture = { startX: x, startY: y, direction: null, lastX: x, lastY: y };
+      },
+
+      updateGesture(x, y) {
+        if (!this._gesture) return;
+        const g = this._gesture;
+        const dx = x - g.startX;
+        const dy = y - g.startY;
+
+        // Determine direction if not yet classified
+        if (!g.direction) {
+          const dir = window.AmbiMath.classifyGesture(dx, dy, 5);
+          if (dir === 'none') return;
+          g.direction = dir;
+          g.lastX = x;
+          g.lastY = y;
+          return;
+        }
+
+        // Apply delta based on classified direction
+        const deltaX = x - g.lastX;
+        const deltaY = y - g.lastY;
+        g.lastX = x;
+        g.lastY = y;
+
+        if (g.direction === 'horizontal') {
+          // Right = positive dx = Yaw increases
+          this.state.yaw = window.AmbiMath.applyYawDelta(this.state.yaw, deltaX, this._sensitivity);
+          this._notify();
+        } else if (g.direction === 'vertical') {
+          // Up = negative deltaY in screen coords = Pitch increases
+          // applyPitchDelta expects positive = up, so negate screen deltaY
+          this.state.pitch = window.AmbiMath.applyPitchDelta(this.state.pitch, -deltaY, this._sensitivity);
+          this._notify();
+        }
+        // Roll is NOT changed by drag gestures (Requirement 5.7)
+      },
+
+      endGesture() {
+        this._gesture = null;
+      },
+
+      setRollEnabled(enabled) {
+        this.state.rollToggle = !!enabled;
+        // Don't change roll value when toggling (Requirement 5.10: preserve previous value)
+        this._notify();
+      },
+
+      setRoll(deg) {
+        if (!this.state.rollToggle) return; // Only allow when toggle is enabled
+        this.state.roll = window.AmbiMath.normalizeAngle360(deg);
+        this._notify();
+      },
+
+      reset() {
+        // Reset all axes to 0 regardless of rollToggle state (Requirement 7.2)
+        this.state.yaw = 0;
+        this.state.pitch = 0;
+        this.state.roll = 0;
+        this._notify();
+      },
+
+      getState() {
+        return { ...this.state };
+      },
+
+      onChange(callback) {
+        this._listeners.push(callback);
+      },
+
+      removeListener(callback) {
+        this._listeners = this._listeners.filter(l => l !== callback);
+      },
+
+      _notify() {
+        const state = this.getState();
+        for (const listener of this._listeners) {
+          listener(state);
+        }
+      },
+    };
+
+    // ============================================================
+    // RotationGizmo — Canvas 2D 球体ギズモ（固定要素）
+    // Task 14.1: 円形回転領域と固定要素の描画
+    // 要件 5.1, 19.1
+    // ============================================================
+    const RotationGizmo = {
+      canvas: null,
+      ctx: null,
+      // Camera parameters (tunable constants per design)
+      // 球体を「後方やや斜め上」から見る視点。
+      // Y軸（左右）が水平に見え、正面方向(+x)は奥に向かう。
+      CAMERA_ELEVATION: 10, // degrees - looking down slightly
+      CAMERA_AZIMUTH: 20,   // degrees - rotated to the right
+      _cameraMatrix: null,  // 3x3 camera rotation matrix (computed once)
+      _bgImageData: null,   // cached background (fixed elements)
+
+      init(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this._computeCameraMatrix();
+        this._resizeCanvas();
+        this.drawFixed();
+        window.addEventListener('resize', () => {
+          this._resizeCanvas();
+          this._bgImageData = null; // invalidate cache on resize
+          this.drawFixed();
+          // Redraw axes with current rotation state after resize
+          this.drawAxes(RotationController.getState());
+        });
+      },
+
+      _resizeCanvas() {
+        const container = this.canvas.parentElement;
+        const size = Math.max(200, Math.min(container.clientWidth, 400));
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = size * dpr;
+        this.canvas.height = size * dpr;
+        this.canvas.style.width = size + 'px';
+        this.canvas.style.height = size + 'px';
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      },
+
+      _computeCameraMatrix() {
+        // カメラは球体を「後方やや斜め上」から見下ろす。
+        // 座標系: x=前方, y=左方, z=上方。
+        // 「後方から見る」= カメラは -x 方向に位置し +x 方向を見る。
+        // 「斜め上から」= elevation > 0 で上から見下ろす。
+        //   → Z軸の円（xy平面）は上半分が奥（薄い）、下半分が手前（濃い）になる。
+        //
+        // カメラ座標: right(→screen X), up(→screen Y), forward(→depth, 正=奥)
+        // 基本姿勢（真後ろから見る）: right=+y, up=+z, forward=+x
+        // Azimuth: z軸まわりに回転（右にずらす）
+        // Elevation: right軸まわりに回転（上から見下ろす）
+        const DEG2RAD = Math.PI / 180;
+        const az = this.CAMERA_AZIMUTH * DEG2RAD;
+        const el = this.CAMERA_ELEVATION * DEG2RAD;
+
+        const caz = Math.cos(az), saz = Math.sin(az);
+        const cel = Math.cos(el), sel = Math.sin(el);
+
+        // After azimuth Rz(az) applied to world coords:
+        //   right = sin(az)*x + cos(az)*y
+        //   forward_pre = cos(az)*x - sin(az)*y
+        //   up_pre = z
+        // After elevation (tilt: look down = rotate around right axis by -el):
+        //   forward = cos(el)*forward_pre - sin(el)*up_pre
+        //   up = sin(el)*forward_pre + cos(el)*up_pre
+        //
+        // Matrix rows: [right, forward, up]
+        this._cameraMatrix = new Float64Array([
+          saz,       caz,       0,         // right
+          cel*caz,   -cel*saz,  -sel,      // forward (positive = away from camera)
+          sel*caz,   -sel*saz,  cel,       // up
+        ]);
+      },
+
+      // Project a 3D point (x,y,z) to 2D canvas coordinates using the camera
+      _project(x, y, z) {
+        const C = this._cameraMatrix;
+        // Camera matrix rows: 0=right, 1=forward(depth), 2=up
+        const right   = C[0]*x + C[1]*y + C[2]*z;
+        const forward = C[3]*x + C[4]*y + C[5]*z;
+        const up      = C[6]*x + C[7]*y + C[8]*z;
+
+        // Parallel projection: screen X = right, screen Y = -up (canvas Y is down)
+        // Depth convention for front/back alpha:
+        //   forward > 0 means the point is away from camera (behind the sphere center from viewer's perspective)
+        //   forward < 0 means the point is towards camera (in front, visible)
+        //   We want depth > 0 = "front" (towards viewer) for alpha purposes
+        const canvasSize = this.canvas.width / (window.devicePixelRatio || 1);
+        const centerX = canvasSize / 2;
+        const centerY = canvasSize / 2;
+        const radius = canvasSize * 0.4;
+
+        return {
+          sx: centerX + right * radius,
+          sy: centerY - up * radius,
+          depth: -forward, // negative forward = towards camera = front (high alpha)
+        };
+      },
+
+      drawFixed() {
+        const ctx = this.ctx;
+        const canvasSize = this.canvas.width / (window.devicePixelRatio || 1);
+        const centerX = canvasSize / 2;
+        const centerY = canvasSize / 2;
+        const radius = canvasSize * 0.4;
+
+        // Clear
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+        // Draw translucent sphere (filled circle)
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(124, 92, 255, 0.06)'; // accent low alpha
+        ctx.fill();
+
+        // Draw sphere outline
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 200, 220, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Draw fixed white front arrow (listener's forward direction)
+        // 矢印は正面方向(+x)を指す。起点と終点は球面上（半径1）。
+        // カメラは後方から見ているので、+x は奥方向に向かう。
+        // 起点: 球面上の -x 方向（手前側）
+        // 終点: 球面上の +x 方向（奥側）
+        const arrowStart = this._project(-1, 0, 0); // sphere surface, towards camera
+        const arrowEnd = this._project(1, 0, 0);    // sphere surface, away from camera
+        const arrowMid = this._project(0.75, 0, 0); // arrowhead base (inside sphere)
+
+        // Arrow shaft
+        ctx.beginPath();
+        ctx.moveTo(arrowStart.sx, arrowStart.sy);
+        ctx.lineTo(arrowEnd.sx, arrowEnd.sy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Arrowhead
+        const dx = arrowEnd.sx - arrowMid.sx;
+        const dy = arrowEnd.sy - arrowMid.sy;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len > 0) {
+          const nx = dx / len;
+          const ny = dy / len;
+          const perpX = -ny * 5;
+          const perpY = nx * 5;
+          ctx.beginPath();
+          ctx.moveTo(arrowEnd.sx, arrowEnd.sy);
+          ctx.lineTo(arrowMid.sx + perpX, arrowMid.sy + perpY);
+          ctx.lineTo(arrowMid.sx - perpX, arrowMid.sy - perpY);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.fill();
+        }
+
+        // Draw listener symbol at center (small person standing upright)
+        // 足元が原点(z=0)に接し、上に立ち上がる
+        const feetPos = this._project(0, 0, 0);       // feet at ground (center)
+        const hipPos = this._project(0, 0, 0.08);     // hip
+        const shoulderPos = this._project(0, 0, 0.18); // shoulders/neck
+        const headPos = this._project(0, 0, 0.24);    // head
+        const headRadius = radius * 0.04;
+
+        // Body line (hip to shoulders only — not through legs)
+        ctx.beginPath();
+        ctx.moveTo(hipPos.sx, hipPos.sy);
+        ctx.lineTo(shoulderPos.sx, shoulderPos.sy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Head (small circle)
+        ctx.beginPath();
+        ctx.arc(headPos.sx, headPos.sy, headRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.fill();
+
+        // Neck (shoulders to head)
+        ctx.beginPath();
+        ctx.moveTo(shoulderPos.sx, shoulderPos.sy);
+        ctx.lineTo(headPos.sx, headPos.sy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Arms (from shoulders, short horizontal)
+        const armL = this._project(0, 0.06, 0.16);
+        const armR = this._project(0, -0.06, 0.16);
+        ctx.beginPath();
+        ctx.moveTo(armL.sx, armL.sy);
+        ctx.lineTo(armR.sx, armR.sy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Legs (from hip to feet, spread to match arm width)
+        const legL = this._project(0, 0.04, 0);
+        const legR = this._project(0, -0.04, 0);
+        ctx.beginPath();
+        ctx.moveTo(hipPos.sx, hipPos.sy);
+        ctx.lineTo(legL.sx, legL.sy);
+        ctx.moveTo(hipPos.sx, hipPos.sy);
+        ctx.lineTo(legR.sx, legR.sy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Cache the fixed background
+        this._bgImageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+      },
+
+      // Restore cached background (called before drawing rotating elements in task 14.2)
+      restoreBackground() {
+        if (this._bgImageData) {
+          this.ctx.putImageData(this._bgImageData, 0, 0);
+        }
+      },
+
+      // Get canvas size info for external use
+      getMetrics() {
+        const canvasSize = this.canvas.width / (window.devicePixelRatio || 1);
+        return {
+          centerX: canvasSize / 2,
+          centerY: canvasSize / 2,
+          radius: canvasSize * 0.4,
+          canvasSize,
+        };
+      },
+
+      // Task 14.2: 3 軸大円の回転追従描画
+      // 要件 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 19.5
+      drawAxes(rotationState) {
+        // Restore fixed background (sphere, outline, arrow)
+        this.restoreBackground();
+        if (!this._bgImageData) {
+          this.drawFixed();
+          this.restoreBackground();
+        }
+
+        const ctx = this.ctx;
+        const { yaw, pitch, roll } = rotationState;
+
+        // Build the 3x3 rotation matrix from current state
+        const R = window.AmbiMath.buildR3(yaw, pitch, roll);
+
+        // Number of discrete points per great circle (64–128 per design)
+        const NUM_POINTS = 96;
+
+        // Axis configurations: X=red, Y=green, Z=blue
+        const axisConfigs = [
+          { color: '#ff4444', label: 'X' }, // X-axis: circle in YZ plane
+          { color: '#44dd66', label: 'Y' }, // Y-axis: circle in XZ plane
+          { color: '#4488ff', label: 'Z' }, // Z-axis: circle in XY plane
+        ];
+
+        for (let axisIdx = 0; axisIdx < 3; axisIdx++) {
+          const { color, label } = axisConfigs[axisIdx];
+
+          // Generate points on the great circle, apply rotation R, then project
+          const points = [];
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const angle = (i / NUM_POINTS) * Math.PI * 2;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            // Generate point on unit circle in the appropriate plane
+            let px, py, pz;
+            if (axisIdx === 0) { // X-axis: circle in YZ plane
+              px = 0; py = cos; pz = sin;
+            } else if (axisIdx === 1) { // Y-axis: circle in XZ plane
+              px = cos; py = 0; pz = sin;
+            } else { // Z-axis: circle in XY plane
+              px = cos; py = sin; pz = 0;
+            }
+
+            // Apply rotation R to the point
+            const rx = R[0]*px + R[1]*py + R[2]*pz;
+            const ry = R[3]*px + R[4]*py + R[5]*pz;
+            const rz = R[6]*px + R[7]*py + R[8]*pz;
+
+            // Project to 2D using camera
+            points.push(this._project(rx, ry, rz));
+          }
+
+          // Draw segments with front/back alpha differentiation
+          for (let i = 0; i < NUM_POINTS; i++) {
+            const p0 = points[i];
+            const p1 = points[(i + 1) % NUM_POINTS];
+            // Midpoint depth determines front/back
+            const midDepth = (p0.depth + p1.depth) / 2;
+            const isFront = midDepth > 0;
+
+            ctx.beginPath();
+            ctx.moveTo(p0.sx, p0.sy);
+            ctx.lineTo(p1.sx, p1.sy);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = isFront ? 0.9 : 0.25;
+            ctx.lineWidth = isFront ? 2 : 1.5;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1.0;
+
+          // Draw axis label near a visible front point of the circle
+          let labelPoint = null;
+          for (const p of points) {
+            if (p.depth > 0) {
+              if (!labelPoint || p.sy < labelPoint.sy) {
+                labelPoint = p;
+              }
+            }
+          }
+          // Fallback: use the point with highest screen Y if no front point
+          if (!labelPoint) {
+            labelPoint = points[0];
+            for (const p of points) {
+              if (p.sy < labelPoint.sy) labelPoint = p;
+            }
+          }
+          ctx.font = '10px sans-serif';
+          ctx.fillStyle = color;
+          ctx.globalAlpha = 0.7;
+          ctx.fillText(label, labelPoint.sx + 4, labelPoint.sy - 4);
+          ctx.globalAlpha = 1.0;
+        }
+      },
+    };
+
+    // ============================================================
+    // ExportManager（Task 16.1）
+    // OfflineAudioContext による回転適用済みレンダリングと WAV エンコード。
+    // 要件 14.1, 15.1
+    // ============================================================
+    const ExportManager = {
+      /**
+       * OfflineAudioContext を用いてオフラインレンダリングを行う。
+       * リアルタイムと同一の AudioWorklet プロセッサを使用する。
+       *
+       * @param {AudioBuffer} audioBuffer - 元音源の AudioBuffer
+       * @param {object} opts - { order, channelCount, rotationState, decodeMode, hrtfPayload, outputChannels }
+       * @returns {Promise<AudioBuffer>} レンダリング結果
+       */
+      async _renderOffline(audioBuffer, opts) {
+        const { order, channelCount, rotationState, decodeMode, hrtfPayload, outputChannels = 2 } = opts;
+        const sampleRate = audioBuffer.sampleRate;
+        const length = audioBuffer.length;
+
+        // Create OfflineAudioContext
+        const offlineCtx = new OfflineAudioContext(outputChannels, length, sampleRate);
+
+        // Register the same worklet module
+        await offlineCtx.audioWorklet.addModule(PROCESSOR_BLOB_URL);
+
+        // Create source
+        const source = offlineCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.channelCount = channelCount;
+        source.channelCountMode = 'explicit';
+        source.channelInterpretation = 'discrete';
+
+        // Create decoder worklet node
+        const decoderNode = new AudioWorkletNode(offlineCtx, 'ambisonics-decoder-processor', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [outputChannels],
+          channelCount: channelCount,
+          channelCountMode: 'explicit',
+          channelInterpretation: 'discrete',
+          processorOptions: {
+            order: order,
+            channelCount: channelCount,
+            outputChannels: outputChannels,
+            stereoMatrix: Array.from(window.AmbiMath.buildStereoDecodeMatrix(order)),
+          },
+        });
+
+        // Set decode mode
+        decoderNode.port.postMessage({ type: 'mode', mode: decodeMode || 'stereo' });
+
+        // Set rotation
+        const isIdentity = window.AmbiMath.isIdentityRotation(
+          rotationState.yaw, rotationState.pitch, rotationState.roll
+        );
+        if (!isIdentity) {
+          const matrix = window.AmbiMath.buildRotationMatrix(order, rotationState.yaw, rotationState.pitch, rotationState.roll);
+          decoderNode.port.postMessage({ type: 'rotation', matrix: matrix, isIdentity: false });
+        }
+
+        // Set HRTF if binaural
+        if (decodeMode === 'binaural' && hrtfPayload) {
+          decoderNode.port.postMessage({
+            type: 'hrir',
+            left: hrtfPayload.left,
+            right: hrtfPayload.right,
+            firLength: hrtfPayload.firLength,
+          });
+        }
+
+        // Connect: source → decoder → destination
+        source.connect(decoderNode);
+        decoderNode.connect(offlineCtx.destination);
+
+        // Start and render
+        source.start(0);
+        const renderedBuffer = await offlineCtx.startRendering();
+        return renderedBuffer;
+      },
+
+      /**
+       * ステレオ書き出し（Task 16.2）
+       * 書き出し時点の回転・デコードモードを適用した 2ch WAV Blob を生成する。
+       * 要件 14.1, 14.2, 14.3, 14.4, 14.5, 14.6
+       *
+       * @param {AudioBuffer} audioBuffer - 元音源の AudioBuffer
+       * @param {{ yaw: number, pitch: number, roll: number }} rotationState - 回転状態
+       * @param {string} decodeMode - 'stereo' | 'binaural'
+       * @param {object|null} hrtfPayload - バイノーラル用 HRTF ペイロード（stereo 時は null 可）
+       * @returns {Promise<Blob>} 2ch WAV Blob
+       */
+      async exportStereo(audioBuffer, rotationState, decodeMode, hrtfPayload) {
+        // Validation
+        if (!audioBuffer) {
+          throw createLoadError(AudioErrorType.EXPORT_NO_SOURCE);
+        }
+
+        const formatInfo = window.AmbiMath.detectFormat(audioBuffer.numberOfChannels);
+        if (!formatInfo) {
+          throw createLoadError(AudioErrorType.EXPORT_ERROR, { detail: '無効な音源です。' });
+        }
+
+        try {
+          // Render offline with current rotation and decode mode (stereo or binaural)
+          const renderedBuffer = await this._renderOffline(audioBuffer, {
+            order: formatInfo.order,
+            channelCount: formatInfo.channelCount,
+            rotationState: rotationState,
+            decodeMode: decodeMode || 'stereo',
+            hrtfPayload: hrtfPayload,
+            outputChannels: 2,
+          });
+
+          // Extract channels from rendered AudioBuffer
+          const channels = [];
+          for (let ch = 0; ch < renderedBuffer.numberOfChannels; ch++) {
+            channels.push(renderedBuffer.getChannelData(ch));
+          }
+
+          // Encode to WAV
+          const wavBuffer = window.AmbiMath.encodeWavPCM(channels, renderedBuffer.sampleRate, 16);
+
+          // Create Blob
+          const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+          return blob;
+        } catch (err) {
+          if (err instanceof AudioLoadError) throw err;
+          throw createLoadError(AudioErrorType.EXPORT_ERROR, { cause: err });
+        }
+      },
+
+      /**
+       * Ambisonics 書き出し（Task 16.3）
+       * デコード行列を恒等にして回転のみ適用した N ch を WAV にエンコードする。
+       * outFormat='fuma' 時は ambixToFuma で変換してから出力する。
+       * 要件 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 16.2, 16.4
+       *
+       * @param {AudioBuffer} audioBuffer - 元音源の AudioBuffer
+       * @param {{ yaw: number, pitch: number, roll: number }} rotationState - 回転状態
+       * @param {{ order: number, channelCount: number, format: string }|null} formatInfo - フォーマット情報
+       * @param {string} outFormat - 'ambix' | 'fuma'
+       * @returns {Promise<Blob>} N ch WAV Blob
+       */
+      async exportAmbisonics(audioBuffer, rotationState, formatInfo, outFormat = 'ambix') {
+        // Validation
+        if (!audioBuffer) {
+          throw createLoadError(AudioErrorType.EXPORT_NO_SOURCE);
+        }
+        if (!formatInfo || !window.AmbiMath.isValidAmbisonicsChannelCount(formatInfo.channelCount)) {
+          throw createLoadError(AudioErrorType.EXPORT_INVALID_AMBISONICS);
+        }
+
+        try {
+          const order = formatInfo.order;
+          const N = formatInfo.channelCount;
+
+          // Extract channels from AudioBuffer
+          const channels = [];
+          for (let ch = 0; ch < N; ch++) {
+            channels.push(new Float32Array(audioBuffer.getChannelData(ch)));
+          }
+
+          // Apply rotation (pure function, no AudioWorklet needed for Ambisonics export)
+          let rotatedChannels;
+          const isIdentity = window.AmbiMath.isIdentityRotation(
+            rotationState.yaw, rotationState.pitch, rotationState.roll
+          );
+          if (isIdentity) {
+            rotatedChannels = channels;
+          } else {
+            const matrix = window.AmbiMath.buildRotationMatrix(order, rotationState.yaw, rotationState.pitch, rotationState.roll);
+            rotatedChannels = window.AmbiMath.applyRotationToBuffer(channels, matrix, order);
+          }
+
+          // Convert to FuMa if requested
+          let outputChannels = rotatedChannels;
+          if (outFormat === 'fuma') {
+            outputChannels = window.AmbiMath.ambixToFuma(rotatedChannels, order);
+          }
+
+          // Encode to multichannel WAV
+          const wavBuffer = window.AmbiMath.encodeWavPCM(outputChannels, audioBuffer.sampleRate, 16);
+
+          // Create Blob
+          const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+          return blob;
+        } catch (err) {
+          if (err instanceof AudioLoadError) throw err;
+          throw createLoadError(AudioErrorType.EXPORT_ERROR, { cause: err });
+        }
+      },
+
+      /**
+       * Blob からダウンロードをトリガーするヘルパー。
+       * @param {Blob} blob - ダウンロード対象の Blob
+       * @param {string} filename - ダウンロードファイル名
+       */
+      _downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      },
+    };
+
+    function isValidUrl(url) {
+      try { new URL(url); return true; } catch { return false; }
+    }
+
+    // NOTE(task 10.2/12.2): 単一トラック構造。format は FormatDetector の判定結果を格納。
+    //   decoderNode は互換用プレースホルダ（実際のデコーダーは AudioEngine.decoder で管理）。
+    function createTrackState() {
+      return {
+        buffer: null,
+        source: null,
+        gainNode: null,
+        decoderNode: null,
+        audioElement: null,
+        mediaSource: null,
+        useMediaElement: false,
+        noCorsMode: false,
+        format: null,
+      };
+    }
+
+    // 単一トラックの再生可否判定（旧 2 トラック AND 条件を廃止）。
+    function isPlayEnabled(trackLoaded) {
+      return !!trackLoaded;
+    }
+
+    class AudioEngine {
+      constructor() {
+        this.audioContext = null;
+        this.track = createTrackState();
+        this.decoder = null;
+        this._workletFailed = false;
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
+        this._volume = 1;
+        this._isLooping = false;
+        this.onPlaybackEnd = null;
+      }
+      async initialize() {
+        if (!this.audioContext) {
+          try { this.audioContext = new AudioContext(); }
+          catch (err) { throw createLoadError(AudioErrorType.AUDIO_CONTEXT_ERROR, { cause: err }); }
+        }
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+        // AudioWorklet プロセッサを登録する。
+        // file:// プロトコル等では Blob URL の読み込みが失敗する。
+        // 失敗時は _workletFailed フラグを立て、再生を不可能とする。
+        if (!this._workletFailed && !this._workletRegistered) {
+          try {
+            await this.audioContext.audioWorklet.addModule(PROCESSOR_BLOB_URL);
+            this._workletRegistered = true;
+          } catch (err) {
+            this._workletFailed = true;
+            throw createLoadError(AudioErrorType.WORKLET_INIT_ERROR, { cause: err });
+          }
+        }
+        this._ensureGainNodes();
+      }
+      // ノードグラフ結線。Task 12.2: Source → gainNode(音量) → AmbisonicsDecoder → destination。
+      // GainNode は入力チャンネル数に一致させ discrete で全チャンネル一様ゲインを適用する。
+      _ensureGainNodes() {
+        const t = this.track;
+        if (!this.audioContext) return;
+        if (!t.gainNode) {
+          t.gainNode = this.audioContext.createGain();
+          t.gainNode.gain.value = this._volume;
+          // Ambisonics チャンネルをそのまま通すため discrete を設定。
+          // channelCount は loadTrack 時に format に合わせて更新する。
+          t.gainNode.channelCountMode = 'explicit';
+          t.gainNode.channelInterpretation = 'discrete';
+          this._connectOutput();
+        }
+      }
+      // gainNode を出力へ接続する単一の結線ポイント。
+      // decoder がある場合: gainNode → decoder → destination
+      // Worklet 失敗時: 接続しない（再生不可）
+      _connectOutput() {
+        const t = this.track;
+        if (!t.gainNode || !this.audioContext) return;
+        // Disconnect existing connections first
+        try { t.gainNode.disconnect(); } catch {}
+        if (this._workletFailed) {
+          return; // 再生不可
+        }
+        if (this.decoder && this.decoder.node) {
+          try { this.decoder.node.disconnect(); } catch {}
+          t.gainNode.connect(this.decoder.node);
+          this.decoder.connect(this.audioContext.destination);
+        }
+      }
+      async loadTrack(url, originalUrl) {
+        if (!isValidUrl(url)) {
+          throw createLoadError(AudioErrorType.INVALID_URL);
+        }
+        if (!this.audioContext) {
+          await this.initialize();
+        }
+
+        let fetchError = null;
+        let isCorsError = false;
+        let response;
+        try {
+          response = await fetch(url);
+        } catch (err) {
+          // TypeError はブラウザによってメッセージが異なる
+          // (Chrome: "Failed to fetch", Safari/WebKit: "Load failed" 等)
+          // TypeError であれば常にCORSフォールバックを試行する
+          if (err instanceof TypeError) {
+            isCorsError = true;
+            fetchError = err;
+          }
+          if (!isCorsError) {
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: err });
+            }
+            throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: err.message || '不明なネットワークエラー', cause: err });
+          }
+        }
+        if (!isCorsError && response) {
+          if (!response.ok) {
+            if (response.type === 'opaque') {
+              isCorsError = true;
+            } else {
+              if (originalUrl && originalUrl !== url) {
+                throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url });
+              }
+              const statusMsg = response.status === 404 ? 'ファイルが見つかりません（404）。URLが正しいか確認してください。'
+                : response.status === 403 ? 'アクセスが拒否されました（403）。ファイルの共有設定を確認してください。'
+                : response.status === 500 ? 'サーバーエラー（500）。しばらく待ってから再試行してください。'
+                : 'HTTP ' + response.status;
+              throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: statusMsg });
+            }
+          }
+        }
+        if (isCorsError) {
+          try {
+            return await this._loadTrackViaAudioElement(url);
+          } catch (audioElErr) {
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || audioElErr });
+            }
+            throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || audioElErr });
+          }
+        }
+        let audioBuffer;
+        try {
+          // Content-Typeが音声でない場合を検出（HTMLページが返された場合など）
+          const contentType = response.headers.get('content-type') || '';
+          const arrayBuffer = await response.arrayBuffer();
+          if (!contentType.startsWith('audio/') && !contentType.startsWith('application/ogg') && !contentType.startsWith('application/octet-stream')) {
+            // HTMLが返された場合（リダイレクト先がログインページ等）
+            if (contentType.includes('text/html')) {
+              throw createLoadError(AudioErrorType.NETWORK_ERROR, {
+                detail: '音声ファイルではなくHTMLページが返されました。URLが音声ファイルへの直接リンクであることを確認してください。'
+              });
+            }
+          }
+          audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        } catch (err) {
+          if (err instanceof AudioLoadError) throw err;
+          throw createLoadError(AudioErrorType.DECODE_ERROR, { cause: err });
+        }
+        // Task 12.2: FormatDetector による判定。4/9/16ch 以外は AudioBuffer を
+        //   保持せず読み込み中止し UNSUPPORTED_CHANNEL_COUNT を表示する（要件 1.7/1.8）。
+        const formatInfo = window.AmbiMath.detectFormat(audioBuffer.numberOfChannels, originalUrl || url);
+        if (!formatInfo) {
+          throw createLoadError(AudioErrorType.UNSUPPORTED_CHANNEL_COUNT);
+        }
+        const t = this.track;
+        t.buffer = audioBuffer;
+        t.useMediaElement = false;
+        t.format = formatInfo;
+        this._ensureGainNodes();
+
+        // Update GainNode channelCount to match Ambisonics channel count
+        if (t.gainNode) {
+          t.gainNode.channelCount = formatInfo.channelCount;
+        }
+
+        // Task 12.2: AmbisonicsDecoder の生成/再生成。
+        // Worklet 失敗時はデコーダーを作成しない。
+        if (!this._workletFailed) {
+          if (this.decoder && this.decoder.order !== formatInfo.order) {
+            this.decoder.dispose();
+            this.decoder = null;
+          }
+          if (!this.decoder) {
+            this.decoder = new AmbisonicsDecoder();
+            await this.decoder.init(this.audioContext, {
+              order: formatInfo.order,
+              channelCount: formatInfo.channelCount,
+            });
+          }
+          // Re-wire the node graph through the decoder
+          this._connectOutput();
+        }
+
+        let name;
+        try {
+          const urlObj = new URL(url);
+          name = urlObj.pathname.split('/').pop() || url;
+        } catch { name = url; }
+        return { name, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels, format: formatInfo };
+      }
+      async _loadTrackViaAudioElement(url) {
+        const t = this.track;
+        if (t.audioElement) {
+          t.audioElement.pause();
+          t.audioElement.removeAttribute('src');
+          t.audioElement.load();
+          if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement);
+        }
+        if (t.mediaSource) {
+          t.mediaSource.disconnect();
+          t.mediaSource = null;
+        }
+
+        // まず crossOrigin='anonymous' で試行（成功すれば MediaElementAudioSourceNode 接続可能）
+        try {
+          return await this._tryLoadAudioElement(url, true);
+        } catch {
+          // CORS非対応の場合、crossOrigin なしで再試行
+          // （Web Audio グラフには接続できないが、audio.volume で音量制御）
+          return await this._tryLoadAudioElement(url, false);
+        }
+      }
+      async _tryLoadAudioElement(url, useCors) {
+        const t = this.track;
+        const audio = document.createElement('audio');
+        if (useCors) {
+          audio.crossOrigin = 'anonymous';
+        }
+        audio.preload = 'auto';
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+        const self = this;
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          const timeoutId = setTimeout(() => {
+            if (!settled) { settled = true; cleanup(); document.body.removeChild(audio); reject(new Error('Audio element load timeout: ' + url)); }
+          }, 15000);
+          const onReady = () => {
+            if (settled) return;
+            if (!isFinite(audio.duration) || audio.duration <= 0) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            cleanup();
+            // DOMに残す（再生に必要）
+            t.audioElement = audio;
+            t.useMediaElement = true;
+            t.buffer = null;
+            self._ensureGainNodes();
+            if (useCors) {
+              t.mediaSource = self.audioContext.createMediaElementSource(audio);
+              t.mediaSource.connect(t.gainNode);
+              t.noCorsMode = false;
+            } else {
+              t.mediaSource = null;
+              t.noCorsMode = true;
+            }
+            let name;
+            try { const urlObj = new URL(url); name = urlObj.pathname.split('/').pop() || url; } catch { name = url; }
+            resolve({ name, duration: audio.duration, sampleRate: self.audioContext.sampleRate, numberOfChannels: 2 });
+          };
+          const onError = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            cleanup();
+            document.body.removeChild(audio);
+            reject(new Error('Audio element failed to load: ' + url));
+          };
+          const cleanup = () => {
+            audio.removeEventListener('canplaythrough', onReady);
+            audio.removeEventListener('loadedmetadata', onReady);
+            audio.removeEventListener('durationchange', onReady);
+            audio.removeEventListener('error', onError);
+          };
+          audio.addEventListener('canplaythrough', onReady);
+          audio.addEventListener('loadedmetadata', onReady);
+          audio.addEventListener('durationchange', onReady);
+          audio.addEventListener('error', onError);
+          audio.src = url;
+          audio.load();
+        });
+      }
+      play(offset) {
+        if (offset === undefined) offset = 0;
+        if (!this.audioContext) return;
+        const trackReady = this.track.buffer || this.track.useMediaElement;
+        if (!trackReady) return;
+        this._stopSources();
+        const clampedOffset = Math.max(0, offset);
+
+        const isMedia = this.track.useMediaElement && this.track.audioElement;
+        if (isMedia) {
+          // MediaElement モード: seeked イベントを待ってから再生
+          this._playMediaElement(clampedOffset);
+        } else {
+          // AudioBuffer モード: 即座に再生
+          this._playBufferSource(clampedOffset);
+        }
+        this._playbackState = { isPlaying: true, startedAt: this.audioContext.currentTime, offset: clampedOffset };
+      }
+      _playBufferSource(offset) {
+        const t = this.track;
+        if (t.buffer) {
+          t.source = this.audioContext.createBufferSource();
+          t.source.buffer = t.buffer;
+          // Task 12.2: Ambisonics チャンネルをミックスせずそのまま通すため
+          //   channelCountMode='explicit' / channelInterpretation='discrete' を設定する。
+          t.source.channelCountMode = 'explicit';
+          t.source.channelInterpretation = 'discrete';
+          t.source.connect(t.gainNode);
+          t.source.start(0, offset);
+        }
+      }
+      _playMediaElement(offset) {
+        const t = this.track;
+        t.audioElement.currentTime = offset;
+        const onSeeked = () => {
+          if (!this._playbackState.isPlaying) return; // 待機中に停止された場合
+          t.audioElement.play();
+          // seeked 完了後の正確なタイミングで startedAt を更新
+          this._playbackState.startedAt = this.audioContext.currentTime;
+        };
+        t.audioElement.addEventListener('seeked', onSeeked, { once: true });
+      }
+      stop() {
+        const currentTime = this.getCurrentTime();
+        this._stopSources();
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: currentTime };
+        return currentTime;
+      }
+      _stopSources() {
+        const t = this.track;
+        if (t.useMediaElement && t.audioElement) { t.audioElement.pause(); }
+        if (t.source) {
+          try { t.source.stop(); } catch {}
+          t.source.disconnect();
+          t.source = null;
+        }
+      }
+      seek(position) {
+        const wasPlaying = this._playbackState.isPlaying;
+        if (wasPlaying) this._stopSources();
+        // [0, duration] にクランプ（要件 10.6/10.7）。
+        const duration = this.getDuration();
+        const clamped = window.AmbiMath.clampSeek(position, duration);
+        this._playbackState.offset = clamped;
+        if (!wasPlaying) {
+          // 停止中のシーク: MediaElement の currentTime だけ更新
+          if (this.track.useMediaElement && this.track.audioElement) { this.track.audioElement.currentTime = this._playbackState.offset; }
+        } else {
+          // 再生中のシーク: play() が seeked を待ってから再生する
+          this.play(this._playbackState.offset);
+        }
+      }
+      setVolume(value) {
+        // フェーダー値を [0,1] にクランプ（要件 12.2/12.3）し、
+        //   GainNode.gain.setValueAtTime でグリッチフリーに全チャンネル一様反映する（要件 12.1）。
+        const v = window.AmbiMath.clampVolume(value);
+        this._volume = v;
+        const t = this.track;
+        if (t.gainNode && this.audioContext) {
+          t.gainNode.gain.setValueAtTime(v, this.audioContext.currentTime);
+        }
+        // noCorsMode トラック（Web Audio グラフ非接続）は audio.volume で直接制御（要件 12.1）
+        if (t.noCorsMode && t.audioElement) {
+          t.audioElement.volume = v;
+        }
+      }
+      getCurrentTime() {
+        if (this._playbackState.isPlaying && this.audioContext) {
+          return this._playbackState.offset + (this.audioContext.currentTime - this._playbackState.startedAt);
+        }
+        return this._playbackState.offset;
+      }
+      setLooping(enabled) { this._isLooping = !!enabled; }
+      getIsLooping() { return this._isLooping; }
+      getDecoder() { return this.decoder; }
+      getDuration() {
+        const t = this.track;
+        if (t.buffer) { return t.buffer.duration; }
+        if (t.useMediaElement && t.audioElement) { return t.audioElement.duration || 0; }
+        return 0;
+      }
+      // 音源クリアを「停止・位置 0・AudioBuffer/audio 要素解放」を不可分に実行する（要件 4.2）。
+      clearTrack() {
+        this._stopSources();
+        const t = this.track;
+        if (t.mediaSource) { t.mediaSource.disconnect(); t.mediaSource = null; }
+        if (t.audioElement) {
+          t.audioElement.pause();
+          t.audioElement.removeAttribute('src');
+          t.audioElement.load();
+          if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement);
+          t.audioElement = null;
+        }
+        t.buffer = null;
+        t.useMediaElement = false;
+        t.noCorsMode = false;
+        t.format = null;
+        // Task 12.2: decoder を破棄する
+        if (this.decoder) {
+          this.decoder.dispose();
+          this.decoder = null;
+        }
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
+      }
+      dispose() {
+        this._stopSources();
+        const t = this.track;
+        if (t.mediaSource) { t.mediaSource.disconnect(); t.mediaSource = null; }
+        if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement); t.audioElement = null; }
+        if (t.gainNode) { t.gainNode.disconnect(); t.gainNode = null; }
+        // Task 12.2: decoder の破棄
+        if (this.decoder) { this.decoder.dispose(); this.decoder = null; }
+        if (t.decoderNode) { try { t.decoderNode.disconnect(); } catch {} t.decoderNode = null; }
+        t.buffer = null;
+        t.useMediaElement = false;
+        t.noCorsMode = false;
+        t.format = null;
+        if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
+        this._isLooping = false;
+        this.onPlaybackEnd = null;
+      }
+    }
+
+    // ============================================================
+    // AppState (single-track, task 10.2)
+    // ============================================================
+    const AppState = {
+      track: {
+        url: '',
+        convertedUrl: null,
+        info: null,
+        loadingState: 'idle',
+        error: null,
+      },
+      volume: 1,
+      playback: {
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0,
+        startedAt: 0,
+      },
+      isLooping: false,
+      decodeMode: 'binaural',
+      binauralAvailable: false,
+      _hrtfPayload: null,
+    };
+
+    // ============================================================
+    // Global instances
+    // ============================================================
+    const audioEngine = new AudioEngine();
+    const waveformRenderer = new WaveformRenderer();
+    let animationFrameId = null;
+
+    // ============================================================
+    // Utility: format time as M:SS
+    // ============================================================
+    // Delegates to AmbiMath.formatTime (canonical implementation)
+    function formatTime(seconds) {
+      return window.AmbiMath.formatTime(seconds);
+    }
+
+    // ============================================================
+    // UI Module (Task 13.1)
+    // ============================================================
+    const UI = {
+      // DOM element references (cached on initialize)
+      els: {},
+
+      initialize() {
+        this.els = {
+          urlA: document.getElementById('url-a'),
+          loadA: document.getElementById('load-a'),
+          loadingA: document.getElementById('loading-a'),
+          errorA: document.getElementById('error-a'),
+          infoA: document.getElementById('info-a'),
+          waveformA: document.getElementById('waveform-a'),
+          volumeA: document.getElementById('volume-a'),
+          playBtn: document.getElementById('play-btn'),
+          seekStartBtn: document.getElementById('seek-start-btn'),
+          loopBtn: document.getElementById('loop-btn'),
+          progressBar: document.getElementById('progress-bar'),
+          currentTimeEl: document.querySelector('#time-display .current-time'),
+          totalTimeEl: document.querySelector('#time-display .total-time'),
+          shareBtn: document.getElementById('share-btn'),
+          shortcutsToggle: document.querySelector('.shortcuts-toggle'),
+          shortcutsList: document.getElementById('shortcuts-list'),
+        };
+
+        // Resize the single waveform canvas to match container width
+        this._resizeCanvas(this.els.waveformA);
+      },
+
+      _resizeCanvas(canvas) {
+        if (!canvas) return;
+        const containerWidth = canvas.parentElement.clientWidth;
+        if (containerWidth > 0) {
+          canvas.width = containerWidth;
+        }
+      },
+
+      updateTrackInfo(info) {
+        const infoEl = this.els.infoA;
+        const nameEl = infoEl.querySelector('.track-name');
+        const durationEl = infoEl.querySelector('.track-duration');
+        if (info) {
+          nameEl.textContent = decodeURIComponent(info.name);
+          durationEl.textContent = formatTime(info.duration);
+        } else {
+          nameEl.textContent = '';
+          durationEl.textContent = '';
+        }
+      },
+
+      setLoading(loading) {
+        const loadingEl = this.els.loadingA;
+        const loadBtn = this.els.loadA;
+        if (loading) {
+          loadingEl.hidden = false;
+          loadBtn.disabled = true;
+        } else {
+          loadingEl.hidden = true;
+          loadBtn.disabled = false;
+        }
+      },
+
+      showError(message) {
+        const errorEl = this.els.errorA;
+        if (message) {
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        } else {
+          errorEl.textContent = '';
+          errorEl.hidden = true;
+        }
+      },
+
+      updatePlayState(isPlaying) {
+        this.els.playBtn.textContent = isPlaying ? '⏹ 停止' : '▶ 再生';
+        this.els.playBtn.setAttribute('aria-label', isPlaying ? '停止' : '再生/停止');
+      },
+
+      updateProgress(currentTime, duration) {
+        if (duration > 0) {
+          this.els.progressBar.max = duration;
+          this.els.progressBar.value = currentTime;
+          this.els.progressBar.setAttribute('aria-valuenow', currentTime.toFixed(1));
+          this.els.progressBar.setAttribute('aria-valuemax', duration.toFixed(1));
+        }
+        this.els.currentTimeEl.textContent = formatTime(currentTime);
+        this.els.totalTimeEl.textContent = formatTime(duration);
+      },
+
+      updateLoopState(isLooping) {
+        this.els.loopBtn.setAttribute('aria-pressed', isLooping ? 'true' : 'false');
+      },
+
+      setTransportEnabled(enabled) {
+        // 要件 10.8: 未読込状態では再生・停止・先頭復帰・ループ・シーク（進捗バー）の
+        //   各操作を無効化（非活性表示）する。読み込み成功時・クリア時・初期化時に呼ぶ。
+        const on = !!enabled;
+        this.els.playBtn.disabled = !on;
+        this.els.seekStartBtn.disabled = !on;
+        this.els.loopBtn.disabled = !on;
+        this.els.progressBar.disabled = !on;
+        // センターパネル（回転UI含む）の表示/非表示
+        const centerPanel = document.getElementById('center-panel');
+        if (centerPanel) {
+          centerPanel.hidden = !on;
+        }
+      },
+    };
+
+    // ============================================================
+    // Event Handlers (Task 13.2)
+    // ============================================================
+
+    async function handleLoadFile(file) {
+      // Ensure AudioContext is initialized on user interaction
+      try {
+        await audioEngine.initialize();
+      } catch (err) {
+        UI.showError(err.userMessage || err.message);
+        return;
+      }
+
+      const trackState = AppState.track;
+      UI.showError(null);
+
+      // ObjectURL を生成
+      const objectUrl = URL.createObjectURL(file);
+      UI.els.urlA.value = '';
+      trackState.url = '';  // ローカルファイルは共有URLに含めない
+      trackState.convertedUrl = null;
+      trackState.loadingState = 'loading';
+      UI.setLoading(true);
+
+      try {
+        const info = await audioEngine.loadTrack(objectUrl);
+        info.name = file.name;  // ObjectURLではなくファイル名を使用
+        trackState.info = info;
+        trackState.loadingState = 'loaded';
+        UI.setLoading(false);
+        UI.updateTrackInfo(info);
+
+        // Show format info (Task 18.1)
+        const formatInfoEl = document.getElementById('format-info');
+        const formatInfoText = document.getElementById('format-info-text');
+        if (info.format) {
+          formatInfoText.textContent = window.AmbiMath.formatInfoToDisplay(info.format);
+          formatInfoEl.hidden = false;
+        } else {
+          formatInfoEl.hidden = true;
+        }
+
+        const canvas = UI.els.waveformA;
+        UI._resizeCanvas(canvas);
+        const buffer = audioEngine.track.buffer;
+        if (buffer) { waveformRenderer.draw(canvas, buffer); }
+
+        const loaded = isPlayEnabled(AppState.track.loadingState === 'loaded');
+        UI.setTransportEnabled(loaded);
+
+        if (AppState.playback.isPlaying) {
+          audioEngine.stop();
+          AppState.playback.isPlaying = false;
+          UI.updatePlayState(false);
+          stopAnimationLoop();
+        }
+        AppState.playback.currentTime = 0;
+        audioEngine._playbackState.offset = 0;
+
+        if (loaded) {
+          const duration = audioEngine.getDuration();
+          AppState.playback.duration = duration;
+          UI.updateProgress(0, duration);
+        }
+
+        // Update source status
+        updateSourceStatus();
+        updateMediaElementWarning();
+
+        // Apply current decode mode to newly created decoder (default: binaural)
+        if (loaded && AppState.decodeMode === 'binaural') {
+          await handleDecodeMode('binaural', true);
+        }
+      } catch (err) {
+        trackState.loadingState = 'error';
+        trackState.error = err.userMessage || err.message;
+        UI.setLoading(false);
+        UI.showError(trackState.error);
+        updateSourceStatus();
+        updateMediaElementWarning();
+      }
+    }
+
+    // Task 19.1: ファイル読み込み UI と URL 変換・エラー結線 — 検証完了。
+    // handleLoadTrack: URLConverter.convert (Dropbox変換), Google Drive検出, ローディング表示,
+    //   formatTime による再生時間表示, 失敗時の状態保持がすべて結線済み。
+    // handleLoadFile: URL.createObjectURL によるローカル読み込み, 同一の loadTrack パス使用。
+    // ドラッグ&ドロップ: e.dataTransfer.files[0] で先頭1ファイルのみ採用。
+    // エラーメッセージ: すべて日本語。updateSourceStatus で状態表示を更新。
+
+    async function handleLoadTrack() {
+      // Ensure AudioContext is initialized on user interaction
+      try {
+        await audioEngine.initialize();
+      } catch (err) {
+        UI.showError(err.userMessage || err.message);
+        return;
+      }
+
+      const rawUrl = UI.els.urlA.value.trim();
+      if (!rawUrl) return;
+
+      // Google Drive URLの検出 — 非対応であることを通知
+      if (/^https?:\/\/drive\.google\.com\//i.test(rawUrl)) {
+        UI.showError('Google Driveの共有リンクには対応していません。Dropboxや、CORSに対応したサーバー上の直接リンクをご利用ください。');
+        return;
+      }
+
+      const trackState = AppState.track;
+
+      // Clear previous error
+      UI.showError(null);
+
+      // Convert URL
+      const { converted, isConverted, originalUrl } = URLConverter.convert(rawUrl);
+      trackState.url = rawUrl;
+      trackState.convertedUrl = isConverted ? converted : null;
+
+      // Set loading state
+      trackState.loadingState = 'loading';
+      UI.setLoading(true);
+
+      try {
+        const info = await audioEngine.loadTrack(converted, isConverted ? originalUrl : undefined);
+        trackState.info = info;
+        trackState.loadingState = 'loaded';
+        UI.setLoading(false);
+        UI.updateTrackInfo(info);
+
+        // Show format info (Task 18.1)
+        const formatInfoEl = document.getElementById('format-info');
+        const formatInfoText = document.getElementById('format-info-text');
+        if (info.format) {
+          formatInfoText.textContent = window.AmbiMath.formatInfoToDisplay(info.format);
+          formatInfoEl.hidden = false;
+        } else {
+          formatInfoEl.hidden = true;
+        }
+
+        // Draw waveform
+        const canvas = UI.els.waveformA;
+        UI._resizeCanvas(canvas);
+        const buffer = audioEngine.track.buffer;
+        if (buffer) {
+          waveformRenderer.draw(canvas, buffer);
+        }
+
+        // Update transport enabled state
+        const loaded = isPlayEnabled(AppState.track.loadingState === 'loaded');
+        UI.setTransportEnabled(loaded);
+
+        // Reset playback position to start when a new track is loaded
+        if (AppState.playback.isPlaying) {
+          audioEngine.stop();
+          AppState.playback.isPlaying = false;
+          UI.updatePlayState(false);
+          stopAnimationLoop();
+        }
+        AppState.playback.currentTime = 0;
+        audioEngine._playbackState.offset = 0;
+
+        // Update progress bar max to audio duration when loaded
+        if (loaded) {
+          const duration = audioEngine.getDuration();
+          AppState.playback.duration = duration;
+          UI.updateProgress(0, duration);
+        }
+
+        // Update browser URL (new schema — task 6.1 / task 19.2)
+        ShareManager.updateUrl({
+          src: AppState.track.loadingState === 'loaded' ? AppState.track.url : null,
+          yaw: RotationController.state.yaw,
+          pitch: RotationController.state.pitch,
+          roll: RotationController.state.roll,
+          rollToggle: RotationController.state.rollToggle,
+          mode: AppState.decodeMode,
+          autoplay: false,
+          loop: AppState.isLooping,
+        });
+
+        // Update source status
+        updateSourceStatus();
+        updateMediaElementWarning();
+
+        // Apply current decode mode to newly created decoder (default: binaural)
+        if (loaded && AppState.decodeMode === 'binaural') {
+          await handleDecodeMode('binaural', true);
+        }
+      } catch (err) {
+        trackState.loadingState = 'error';
+        trackState.error = err.userMessage || err.message;
+        UI.setLoading(false);
+        UI.showError(trackState.error);
+        updateSourceStatus();
+        updateMediaElementWarning();
+      }
+    }
+
+    function updateSourceStatus() {
+      const trackState = AppState.track;
+      const statusText = document.querySelector('#source-status-a .source-status-text');
+      const clearBtn = document.getElementById('clear-a');
+
+      if (trackState.loadingState !== 'loaded' || !trackState.info) {
+        statusText.textContent = '音源が読み込まれていません';
+        statusText.className = 'source-status-text';
+        clearBtn.hidden = true;
+        return;
+      }
+
+      if (trackState.url) {
+        // Network file
+        statusText.textContent = '🌐 ' + trackState.url;
+        statusText.className = 'source-status-text loaded-network';
+      } else {
+        // Local file
+        statusText.textContent = '📁 ' + trackState.info.name;
+        statusText.className = 'source-status-text loaded-local';
+      }
+      clearBtn.hidden = false;
+    }
+
+    function updateMediaElementWarning() {
+      const t = audioEngine.track;
+      const warningEl = document.getElementById('warning-a');
+      const canvas = UI.els.waveformA;
+      const isMediaElement = t.useMediaElement;
+
+      // Task 18.2: In MediaElement mode, disable waveform, decode mode selector,
+      // rotation canvas, and export buttons (if they exist)
+      const modeStereo = document.getElementById('mode-stereo');
+      const modeBinaural = document.getElementById('mode-binaural');
+      const rotationCanvas = document.getElementById('rotation-canvas');
+
+      if (isMediaElement) {
+        warningEl.hidden = false;
+        canvas.classList.add('disabled');
+        // Disable decode mode buttons
+        if (modeStereo) modeStereo.disabled = true;
+        if (modeBinaural) modeBinaural.disabled = true;
+        // Disable rotation canvas interaction
+        if (rotationCanvas) rotationCanvas.style.pointerEvents = 'none';
+      } else {
+        warningEl.hidden = true;
+        canvas.classList.remove('disabled');
+        // Re-enable decode mode buttons
+        if (modeStereo) modeStereo.disabled = false;
+        if (modeBinaural) modeBinaural.disabled = false;
+        // Re-enable rotation canvas interaction
+        if (rotationCanvas) rotationCanvas.style.pointerEvents = '';
+      }
+    }
+
+    function handleClearTrack() {
+      const trackState = AppState.track;
+
+      // Stop playback if playing
+      if (AppState.playback.isPlaying) {
+        AppState.playback.isPlaying = false;
+        UI.updatePlayState(false);
+        stopAnimationLoop();
+      }
+
+      // Atomic clear of audio engine track (stop + reset position 0 + release buffer/element)
+      audioEngine.clearTrack();
+
+      // Clear track state
+      trackState.url = '';
+      trackState.convertedUrl = null;
+      trackState.info = null;
+      trackState.loadingState = 'idle';
+      trackState.error = null;
+
+      // Clear UI
+      UI.els.urlA.value = '';
+      UI.updateTrackInfo(null);
+      UI.showError(null);
+      UI.setTransportEnabled(false);
+
+      // Hide format info (Task 18.1)
+      document.getElementById('format-info').hidden = true;
+
+      // Clear waveform
+      const canvas = UI.els.waveformA;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1a1a35';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Reset playback position
+      AppState.playback.currentTime = 0;
+      UI.updateProgress(0, 0);
+
+      // Update source status
+      updateSourceStatus();
+      updateMediaElementWarning();
+    }
+
+    function handleTogglePlay() {
+      if (!isPlayEnabled(AppState.track.loadingState === 'loaded')) return;
+
+      if (AppState.playback.isPlaying) {
+        // Stop
+        const currentTime = audioEngine.stop();
+        AppState.playback.isPlaying = false;
+        AppState.playback.currentTime = currentTime;
+        UI.updatePlayState(false);
+        stopAnimationLoop();
+      } else {
+        // Play
+        audioEngine.play(AppState.playback.currentTime);
+        AppState.playback.isPlaying = true;
+        UI.updatePlayState(true);
+        startAnimationLoop();
+      }
+    }
+
+    function handleVolumeChange(value) {
+      const v = parseFloat(value);
+      AppState.volume = v;
+      audioEngine.setVolume(v);
+    }
+
+    function handleProgressSeek(value) {
+      const duration = audioEngine.getDuration();
+      // [0, duration] にクランプ（要件 10.6/10.7）。
+      const position = window.AmbiMath.clampSeek(parseFloat(value), duration);
+      AppState.playback.currentTime = position;
+      audioEngine.seek(position);
+      UI.updateProgress(position, duration);
+
+      // Update waveform playhead
+      if (duration > 0) {
+        const progress = position / duration;
+        waveformRenderer.updatePlayhead(UI.els.waveformA, progress);
+      }
+    }
+
+    function handleLoopToggle() {
+      AppState.isLooping = !AppState.isLooping;
+      audioEngine.setLooping(AppState.isLooping);
+      UI.updateLoopState(AppState.isLooping);
+    }
+
+    async function handleShare() {
+      // Task 19.2: 全パラメータ（回転・デコードモード含む）を state オブジェクトとして渡す
+      const state = {
+        src: AppState.track.loadingState === 'loaded' ? AppState.track.url : null,
+        yaw: RotationController.state.yaw,
+        pitch: RotationController.state.pitch,
+        roll: RotationController.state.roll,
+        rollToggle: RotationController.state.rollToggle,
+        mode: AppState.decodeMode,
+        autoplay: false,
+        loop: AppState.isLooping,
+      };
+      const shareUrl = ShareManager.generateShareUrl(state);
+      const success = await ShareManager.copyToClipboard(shareUrl);
+      const shareBtn = UI.els.shareBtn;
+      const originalText = shareBtn.textContent;
+      if (success) {
+        shareBtn.textContent = '✅ コピーしました!';
+        setTimeout(() => { shareBtn.textContent = originalText; }, 2000);
+      } else {
+        // 要件 13.9/13.10: コピー失敗時は URL を手動コピー用に表示する
+        shareBtn.textContent = '❌ コピーに失敗しました';
+        // 一時的に URL を表示する要素を作成
+        let urlDisplay = document.getElementById('share-url-display');
+        if (!urlDisplay) {
+          urlDisplay = document.createElement('input');
+          urlDisplay.id = 'share-url-display';
+          urlDisplay.type = 'text';
+          urlDisplay.readOnly = true;
+          urlDisplay.style.cssText = 'width:100%;margin-top:8px;padding:6px 10px;background:var(--color-bg-input);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:0.75rem;';
+          urlDisplay.setAttribute('aria-label', '共有URL（手動コピー用）');
+          shareBtn.parentElement.appendChild(urlDisplay);
+        }
+        urlDisplay.value = shareUrl;
+        urlDisplay.hidden = false;
+        urlDisplay.select();
+        setTimeout(() => {
+          shareBtn.textContent = originalText;
+          urlDisplay.hidden = true;
+        }, 8000);
+      }
+    }
+
+    function handleWaveformClick(event) {
+      // MediaElement モードでは波形クリックシークを無効化
+      const t = audioEngine.track;
+      if (t.useMediaElement) return;
+
+      const canvas = UI.els.waveformA;
+      const position = waveformRenderer.getPositionFromClick(canvas, event.clientX);
+      const duration = audioEngine.getDuration();
+      if (duration > 0) {
+        const seekTime = position * duration;
+        handleProgressSeek(seekTime);
+      }
+    }
+
+    // ============================================================
+    // Animation Loop (Task 13.3)
+    // ============================================================
+
+    function startAnimationLoop() {
+      if (animationFrameId) return;
+      function tick() {
+        if (!AppState.playback.isPlaying) {
+          animationFrameId = null;
+          return;
+        }
+
+        const currentTime = audioEngine.getCurrentTime();
+        const duration = audioEngine.getDuration();
+
+        // End-of-track detection
+        if (duration > 0 && currentTime >= duration) {
+          if (AppState.isLooping) {
+            // Loop: restart from beginning
+            audioEngine.stop();
+            AppState.playback.currentTime = 0;
+            audioEngine.play(0);
+            AppState.playback.isPlaying = true;
+          } else {
+            // Stop: reset to beginning
+            audioEngine.stop();
+            AppState.playback.isPlaying = false;
+            AppState.playback.currentTime = 0;
+            UI.updatePlayState(false);
+            UI.updateProgress(0, duration);
+            waveformRenderer.updatePlayhead(UI.els.waveformA, 0);
+            animationFrameId = null;
+            return;
+          }
+        }
+
+        // Update progress bar and time display
+        const displayTime = Math.min(currentTime, duration);
+        AppState.playback.currentTime = displayTime;
+        UI.updateProgress(displayTime, duration);
+
+        // Update waveform playhead
+        if (duration > 0) {
+          const progress = displayTime / duration;
+          waveformRenderer.updatePlayhead(UI.els.waveformA, progress);
+        }
+
+        animationFrameId = requestAnimationFrame(tick);
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    }
+
+    function stopAnimationLoop() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    }
+
+    // ============================================================
+    // Decode Mode & HRTF Loading (Task 15.4)
+    // ============================================================
+
+    async function handleDecodeMode(mode, force = false) {
+      if (!force && mode === AppState.decodeMode) return;
+
+      if (mode === 'binaural') {
+        // Try to load HRTF if not already loaded
+        if (!AppState._hrtfPayload) {
+          const success = await loadHRTF();
+          if (!success) {
+            // Show HRTF select button, fall back to stereo for now
+            // Don't disable binaural button — user can still load HRTF via the button
+            AppState.decodeMode = 'stereo';
+            if (audioEngine.decoder) {
+              audioEngine.decoder.setDecodeMode('stereo');
+            }
+            // Update UI to show stereo as active
+            document.getElementById('mode-stereo').classList.add('mode-btn-active');
+            document.getElementById('mode-stereo').setAttribute('aria-checked', 'true');
+            document.getElementById('mode-binaural').classList.remove('mode-btn-active');
+            document.getElementById('mode-binaural').setAttribute('aria-checked', 'false');
+            return;
+          }
+        }
+        // Send HRTF to decoder
+        if (audioEngine.decoder && AppState._hrtfPayload) {
+          audioEngine.decoder.setBinauralHRTF(AppState._hrtfPayload);
+        }
+      }
+
+      AppState.decodeMode = mode;
+
+      // Update decoder mode
+      if (audioEngine.decoder) {
+        audioEngine.decoder.setDecodeMode(mode);
+      }
+
+      // Update UI
+      document.getElementById('mode-stereo').classList.toggle('mode-btn-active', mode === 'stereo');
+      document.getElementById('mode-stereo').setAttribute('aria-checked', mode === 'stereo' ? 'true' : 'false');
+      document.getElementById('mode-binaural').classList.toggle('mode-btn-active', mode === 'binaural');
+      document.getElementById('mode-binaural').setAttribute('aria-checked', mode === 'binaural' ? 'true' : 'false');
+    }
+
+    async function loadHRTF() {
+      const order = audioEngine.decoder ? audioEngine.decoder.order : 3;
+
+      // Step 1: Try to fetch the fixed external file hrir_sh.json
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const response = await fetch('hrir_sh.json', { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (window.AmbiMath.validateHRTF(data, order)) {
+            AppState._hrtfPayload = window.AmbiMath.toWorkletPayload(data, order);
+            AppState.binauralAvailable = true;
+            return true;
+          }
+        }
+      } catch (err) {
+        // Fetch failed or timed out — fall through to local file dialog
+      }
+
+      // Step 2: Open file selection dialog directly
+      try {
+        const file = await promptLocalHRTFFile();
+        if (!file) return false; // User cancelled
+
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (window.AmbiMath.validateHRTF(data, order)) {
+          AppState._hrtfPayload = window.AmbiMath.toWorkletPayload(data, order);
+          AppState.binauralAvailable = true;
+          return true;
+        }
+      } catch (err) {
+        // Local file failed
+      }
+
+      // Both failed
+      AppState.binauralAvailable = false;
+      return false;
+    }
+
+    function promptLocalHRTFFile() {
+      return new Promise((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        input.addEventListener('change', () => {
+          resolve(input.files[0] || null);
+          document.body.removeChild(input);
+        });
+        // Handle cancel (no file selected)
+        // Use a focus-back heuristic since 'cancel' event is not universally supported
+        input.addEventListener('cancel', () => {
+          resolve(null);
+          document.body.removeChild(input);
+        });
+        input.click();
+      });
+    }
+
+    // ============================================================
+    // Application Initialization (Task 14.1 & 14.2)
+    // ============================================================
+
+    function initApp() {
+      // Initialize UI module
+      UI.initialize();
+
+      // 初期（未読込）状態: 再生・停止・先頭復帰・ループ・シークを無効化する（要件 10.8）。
+      //   マークアップは最小に保ち、無効化は JS 初期化で一括設定する。
+      UI.setTransportEnabled(false);
+      // 未読込状態 UI: フォーマット情報は非表示のまま、ソースステータスに
+      //   「音源が読み込まれていません」を表示する（要件 2.5, 4.3）。
+      updateSourceStatus();
+
+      // --- Set README link URL ---
+      // Auto-detect GitHub repo URL from github.io hosting, otherwise use a placeholder
+      const readmeLink = document.getElementById('readme-link');
+      if (readmeLink) {
+        const host = window.location.hostname;
+        if (host.endsWith('.github.io')) {
+          const user = host.replace('.github.io', '');
+          const repo = window.location.pathname.split('/')[1] || '';
+          readmeLink.href = 'https://github.com/' + user + '/' + repo + '#readme';
+        }
+      }
+
+      // --- Event Listeners (single-track, task 10.2) ---
+
+      // Load button
+      UI.els.loadA.addEventListener('click', () => handleLoadTrack());
+
+      // File button
+      const fileInputA = document.getElementById('file-input-a');
+      document.getElementById('file-a').addEventListener('click', () => fileInputA.click());
+      fileInputA.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleLoadFile(e.target.files[0]);
+        e.target.value = '';  // 同じファイルを再選択可能にする
+      });
+
+      // Clear button
+      document.getElementById('clear-a').addEventListener('click', () => handleClearTrack());
+
+      // Drag & drop on track panel (先頭 1 ファイルのみ採用)
+      const trackPanel = document.getElementById('track-a');
+      if (trackPanel) {
+        trackPanel.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          trackPanel.classList.add('drop-active');
+        });
+        trackPanel.addEventListener('dragleave', (e) => {
+          // Only remove if leaving the panel (not entering a child)
+          if (!trackPanel.contains(e.relatedTarget)) {
+            trackPanel.classList.remove('drop-active');
+          }
+        });
+        trackPanel.addEventListener('drop', (e) => {
+          e.preventDefault();
+          trackPanel.classList.remove('drop-active');
+          const file = e.dataTransfer.files[0];
+          if (file) handleLoadFile(file);
+        });
+      }
+
+      // Allow Enter key in URL input to trigger load
+      UI.els.urlA.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleLoadTrack();
+      });
+
+      // Play/Stop button
+      UI.els.playBtn.addEventListener('click', handleTogglePlay);
+
+      // Seek to start button
+      UI.els.seekStartBtn.addEventListener('click', () => {
+        handleProgressSeek(0);
+      });
+
+      // Loop button
+      UI.els.loopBtn.addEventListener('click', handleLoopToggle);
+
+      // Volume slider
+      UI.els.volumeA.addEventListener('input', (e) => {
+        handleVolumeChange(e.target.value);
+      });
+
+      // Progress bar
+      UI.els.progressBar.addEventListener('input', (e) => {
+        handleProgressSeek(e.target.value);
+      });
+
+      // Share button
+      UI.els.shareBtn.addEventListener('click', handleShare);
+
+      // Waveform click
+      UI.els.waveformA.addEventListener('click', (e) => handleWaveformClick(e));
+
+      // Keyboard shortcuts help toggle
+      UI.els.shortcutsToggle.addEventListener('click', () => {
+        const list = UI.els.shortcutsList;
+        const isHidden = list.hidden;
+        list.hidden = !isHidden;
+        UI.els.shortcutsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      });
+
+      // --- Register Keyboard Handler (task 10.5: Space → toggle play, 登録キーのみ preventDefault) ---
+      KeyboardHandler.register({
+        onTogglePlay: handleTogglePlay,
+      });
+
+      // --- Task 13.3: 回転状態表示・リセットの結線 ---
+      // 初期表示を 0° に設定（要件 6.3）
+      document.getElementById('yaw-display').textContent = 'Yaw: 0°';
+      document.getElementById('pitch-display').textContent = 'Pitch: 0°';
+      document.getElementById('roll-display').textContent = 'Roll: 0°';
+
+      // --- Task 14.1: 回転 UI ビジュアル（Canvas 2D 球体ギズモ）初期化 ---
+      RotationGizmo.init('rotation-canvas');
+      // Task 14.2: Initial draw of axes at identity rotation
+      RotationGizmo.drawAxes({ yaw: 0, pitch: 0, roll: 0 });
+
+      // Task 14.2: Wire pointer/touch events on the rotation canvas
+      const rotCanvas = document.getElementById('rotation-canvas');
+      rotCanvas.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        rotCanvas.setPointerCapture(e.pointerId);
+        RotationController.beginGesture(e.clientX, e.clientY);
+      });
+      rotCanvas.addEventListener('pointermove', (e) => {
+        if (!e.buttons) return; // not dragging
+        e.preventDefault();
+        RotationController.updateGesture(e.clientX, e.clientY);
+      });
+      rotCanvas.addEventListener('pointerup', (e) => {
+        rotCanvas.releasePointerCapture(e.pointerId);
+        RotationController.endGesture();
+      });
+      rotCanvas.addEventListener('pointercancel', (e) => {
+        RotationController.endGesture();
+      });
+
+      // Roll toggle button (要件 5.8, 5.9, 5.10)
+      document.getElementById('roll-toggle-btn').addEventListener('click', () => {
+        const isEnabled = RotationController.state.rollToggle;
+        RotationController.setRollEnabled(!isEnabled);
+
+        // Update button state
+        const btn = document.getElementById('roll-toggle-btn');
+        btn.setAttribute('aria-pressed', (!isEnabled) ? 'true' : 'false');
+        btn.classList.toggle('mode-btn-active', !isEnabled);
+
+        // Show/hide slider
+        document.getElementById('roll-slider-container').hidden = isEnabled; // hide if was enabled (now disabled)
+      });
+
+      // Roll slider (要件 5.11)
+      document.getElementById('roll-slider').addEventListener('input', (e) => {
+        const deg = parseFloat(e.target.value);
+        RotationController.setRoll(deg);
+      });
+
+      // RotationController.onChange → デコーダーへの回転反映 + 状態表示更新 + ギズモ再描画
+      RotationController.onChange((state) => {
+        // Update rotation display (要件 6.1, 6.2)
+        document.getElementById('yaw-display').textContent = 'Yaw: ' + window.AmbiMath.roundAngleForDisplay(state.yaw, 'yaw') + '°';
+        document.getElementById('pitch-display').textContent = 'Pitch: ' + window.AmbiMath.roundAngleForDisplay(state.pitch, 'pitch') + '°';
+        document.getElementById('roll-display').textContent = 'Roll: ' + window.AmbiMath.roundAngleForDisplay(state.roll, 'roll') + '°';
+
+        // Task 14.2: Redraw gizmo axes with current rotation
+        RotationGizmo.drawAxes(state);
+
+        // Task 14.3: Sync Roll slider value (e.g., on reset)
+        const rollSlider = document.getElementById('roll-slider');
+        if (rollSlider) {
+          rollSlider.value = Math.round(window.AmbiMath.normalizeAngle360(state.roll));
+        }
+
+        // Send rotation matrix to decoder (要件 5.12, 8.4, 7.3)
+        if (audioEngine.decoder) {
+          const order = audioEngine.decoder.order;
+          const isIdentity = window.AmbiMath.isIdentityRotation(state.yaw, state.pitch, state.roll);
+          if (isIdentity) {
+            audioEngine.decoder.setRotationMatrix(null, true);
+          } else {
+            const matrix = window.AmbiMath.buildRotationMatrix(order, state.yaw, state.pitch, state.roll);
+            audioEngine.decoder.setRotationMatrix(matrix, false);
+          }
+        }
+      });
+
+      // Reset button (要件 7.1, 7.2)
+      document.getElementById('rotation-reset-btn').addEventListener('click', () => {
+        RotationController.reset();
+      });
+
+      // --- Task 15.4: Decode mode selector event listeners ---
+      document.getElementById('mode-stereo').addEventListener('click', () => handleDecodeMode('stereo'));
+      document.getElementById('mode-binaural').addEventListener('click', () => handleDecodeMode('binaural'));
+
+      // --- Handle window resize for waveform canvas ---
+      window.addEventListener('resize', () => {
+        UI._resizeCanvas(UI.els.waveformA);
+        // Redraw waveform if buffer exists
+        if (audioEngine.track.buffer) {
+          waveformRenderer.draw(UI.els.waveformA, audioEngine.track.buffer);
+        }
+      });
+
+      // --- URL Query Parameter Auto-Load (new schema — task 6.1 / task 19.2: full overlay結線) ---
+      const params = ShareManager.getUrlParams();
+      if (params.src) {
+        UI.els.urlA.value = params.src;
+      }
+      // Auto-load track if URL param is present.
+      // AudioContext requires a user gesture, so we register a one-time click handler
+      // that initializes AudioContext and then loads the track.
+      if (params.src) {
+        const autoLoadOverlay = document.createElement('div');
+        autoLoadOverlay.id = 'auto-load-overlay';
+        autoLoadOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,13,26,0.92);display:flex;align-items:center;justify-content:center;z-index:1000;cursor:pointer;padding:24px;';
+
+        // URLからファイル名を抽出する関数
+        function extractFileName(url) {
+          try {
+            const pathname = new URL(url).pathname;
+            const segments = pathname.split('/');
+            for (let i = segments.length - 1; i >= 0; i--) {
+              const seg = decodeURIComponent(segments[i]);
+              if (/\.(wav|mp3|flac|ogg)$/i.test(seg)) return seg;
+            }
+            // 拡張子が見つからない場合は最後のセグメント
+            const last = decodeURIComponent(segments[segments.length - 1]);
+            return last || null;
+          } catch { return null; }
+        }
+
+        function formatTrackEntry(url) {
+          const safeUrl = url.replace(/</g, '&lt;');
+          const fileName = extractFileName(url);
+          if (fileName) {
+            return '<div style="margin:8px 0;">' +
+              '<p style="font-size:0.95rem;color:#7c5cff;margin:0 0 2px;font-weight:600;">音源: ' + fileName.replace(/</g, '&lt;') + '</p>' +
+              '<p style="font-size:0.7rem;color:#666680;margin:0;word-break:break-all;">' + safeUrl + '</p>' +
+            '</div>';
+          }
+          return '<div style="margin:8px 0;">' +
+            '<p style="font-size:0.95rem;color:#7c5cff;margin:0 0 2px;font-weight:600;">音源</p>' +
+            '<p style="font-size:0.7rem;color:#666680;margin:0;word-break:break-all;">' + safeUrl + '</p>' +
+          '</div>';
+        }
+
+        let urlListHtml = formatTrackEntry(params.src);
+
+        // Task 19.2: Additional parameters display (rotation, mode, loop)
+        let optionsHtml = '';
+        const optionItems = [];
+        if (params.yaw !== 0 || params.pitch !== 0 || params.roll !== 0) {
+          optionItems.push('Yaw: ' + params.yaw + '° / Pitch: ' + params.pitch + '° / Roll: ' + params.roll + '°');
+        }
+        if (params.rollToggle) { optionItems.push('Roll操作: ON'); }
+        if (params.mode === 'binaural') { optionItems.push('モード: バイノーラル'); }
+        if (params.loop) { optionItems.push('ループ: ON'); }
+        if (params.autoplay) { optionItems.push('自動再生: ON'); }
+        if (optionItems.length > 0) {
+          optionsHtml = '<p style="font-size:0.78rem;color:#8888aa;margin:8px 0 0;">' + optionItems.join(' / ') + '</p>';
+        }
+
+        autoLoadOverlay.innerHTML =
+          '<div style="text-align:center;color:#e0e0f0;max-width:600px;">' +
+            '<p style="font-size:1.3rem;margin-bottom:8px;">🎵 AmbisonicsPlayer</p>' +
+            '<p style="font-size:0.95rem;color:#8888aa;margin-bottom:16px;">Ambisonics 再生用の音源として、ネットワーク上のファイルを読み込みます。</p>' +
+            '<div style="background:rgba(26,26,53,0.8);border:1px solid #2a2a4a;border-radius:8px;padding:12px 16px;margin-bottom:20px;text-align:left;">' +
+              urlListHtml + optionsHtml +
+            '</div>' +
+            '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">' +
+              '<p id="auto-load-confirm" style="font-size:1rem;color:#e0e0f0;padding:10px 28px;display:inline-block;border:1px solid #7c5cff;border-radius:8px;background:rgba(124,92,255,0.12);cursor:pointer;">▶ クリックして読み込みを開始</p>' +
+              '<p id="auto-load-cancel" style="font-size:0.9rem;color:#8888aa;padding:10px 20px;display:inline-block;border:1px solid #2a2a4a;border-radius:8px;cursor:pointer;">✕ キャンセル</p>' +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(autoLoadOverlay);
+
+        // 要件 13.8: キャンセルで読み込まない
+        const cancelBtn = autoLoadOverlay.querySelector('#auto-load-cancel');
+        cancelBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          autoLoadOverlay.remove();
+        });
+
+        const startAutoLoad = async () => {
+          autoLoadOverlay.remove();
+          await handleLoadTrack();
+
+          // Task 19.2: Apply rotation state from URL params after track is loaded
+          if (AppState.track.loadingState === 'loaded') {
+            // Apply rotation (Yaw/Pitch/Roll)
+            if (params.yaw !== 0 || params.pitch !== 0 || params.roll !== 0) {
+              RotationController.state.yaw = params.yaw;
+              RotationController.state.pitch = params.pitch;
+              RotationController.state.roll = params.roll;
+              RotationController._notify();
+            }
+
+            // Apply Roll toggle
+            if (params.rollToggle) {
+              RotationController.setRollEnabled(true);
+              const rollBtn = document.getElementById('roll-toggle-btn');
+              rollBtn.setAttribute('aria-pressed', 'true');
+              rollBtn.classList.add('mode-btn-active');
+              document.getElementById('roll-slider-container').hidden = false;
+              // Sync slider value
+              document.getElementById('roll-slider').value = Math.round(window.AmbiMath.normalizeAngle360(params.roll));
+            }
+
+            // Apply decode mode (binaural)
+            if (params.mode === 'binaural') {
+              await handleDecodeMode('binaural');
+            }
+
+            // Apply loop
+            if (params.loop) {
+              AppState.isLooping = true;
+              audioEngine.setLooping(true);
+              UI.updateLoopState(true);
+            }
+
+            // Apply autoplay (要件 13.7)
+            if (params.autoplay) {
+              handleTogglePlay();
+            }
+          } else {
+            // 要件 13.9: 自動読み込み失敗時は日本語メッセージ表示・自動再生しない
+            // handleLoadTrack already shows the error message
+          }
+        };
+
+        // Confirm button or overlay click triggers load
+        const confirmBtn = autoLoadOverlay.querySelector('#auto-load-confirm');
+        confirmBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          startAutoLoad();
+        });
+        // Also allow clicking anywhere on the overlay (except cancel) to start
+        autoLoadOverlay.addEventListener('click', (e) => {
+          if (e.target === cancelBtn || cancelBtn.contains(e.target)) return;
+          startAutoLoad();
+        }, { once: true });
+      }
+
+      // --- ?selftest=1 モード（ブラウザ内インラインテスト） ---
+      // CI 非依存の単一ファイル配布向け。コンソールに AmbiMath 名前空間の内容を出力する。
+      if (location.search.includes('selftest=1')) {
+        console.log('[selftest] AmbiMath namespace:', Object.keys(window.AmbiMath));
+        console.log('[selftest] AmbiMath object:', window.AmbiMath);
+        console.log('[selftest] セルフテスト完了。純粋関数のプロパティテストは test/ ハーネスで実行してください。');
+      }
+    }
+
+    // Start the application when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  </script>
+</body>
+</html>

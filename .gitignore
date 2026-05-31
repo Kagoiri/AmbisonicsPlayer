@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Development files
+src/
+test/
+tests/
+package.json
+package-lock.json
+vitest.config.js
+README-dev.md
+
+# Vitest
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Kiro
+.kiro/
