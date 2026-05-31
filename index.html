@@ -2525,7 +2525,9 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         const { yaw, pitch, roll } = rotationState;
 
         // Build the 3x3 rotation matrix from current state
-        const R = window.AmbiMath.buildR3(yaw, pitch, roll);
+        // 視覚的な回転方向: 球体の手前側（カメラ側）を触って回す感覚にするため
+        // Yaw を反転して描画する（音源への回転値はそのまま）
+        const R = window.AmbiMath.buildR3(-yaw, pitch, roll);
 
         // Number of discrete points per great circle (64–128 per design)
         const NUM_POINTS = 96;
@@ -3394,6 +3396,15 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         const centerPanel = document.getElementById('center-panel');
         if (centerPanel) {
           centerPanel.hidden = !on;
+          // パネル表示直後に Canvas サイズを再計算（hidden 中は clientWidth=0 のため）
+          if (on && RotationGizmo.canvas) {
+            setTimeout(() => {
+              RotationGizmo._resizeCanvas();
+              RotationGizmo._bgImageData = null;
+              RotationGizmo.drawFixed();
+              RotationGizmo.drawAxes(RotationController.getState());
+            }, 0);
+          }
         }
       },
     };
