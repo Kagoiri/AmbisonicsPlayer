@@ -1972,11 +1972,23 @@ class AmbisonicsDecoderProcessor extends AudioWorkletProcessor {
           this.curMatrix = null;
           this.transitionAlpha = 1.0;
         } else if (!this.curMatrix) {
+          // First non-identity: snap immediately
           this.curMatrix = new Float64Array(msg.matrix);
           this.transitionAlpha = 1.0;
         } else {
+          // 改善3: 遷移中に新目標が来たら、現在の補間位置を新しい curMatrix として採用
+          if (this.transitionAlpha < 1.0 && this.targetMatrix) {
+            const a = this.transitionAlpha;
+            const N2 = this.N * this.N;
+            const snapped = new Float64Array(N2);
+            for (let i = 0; i < N2; i++) {
+              snapped[i] = this.curMatrix[i] * (1 - a) + this.targetMatrix[i] * a;
+            }
+            this.curMatrix = snapped;
+          }
+          // 改善2: 遷移時間を 10ms に短縮（ドラッグ更新間隔 ~16ms より短い）
           this.transitionAlpha = 0;
-          this.transitionSpeed = 1.0 / (0.03 * sampleRate / 128);
+          this.transitionSpeed = 1.0 / (0.01 * sampleRate / 128);
         }
         break;
       case 'mode':
