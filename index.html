@@ -524,6 +524,7 @@
       display: flex;
       gap: 12px;
       justify-content: center;
+      flex-wrap: nowrap;
     }
 
     .transport-btn {
@@ -615,6 +616,7 @@
       display: flex;
       gap: 8px;
       justify-content: center;
+      flex-wrap: nowrap;
     }
     .mode-btn {
       padding: 8px 16px;
@@ -641,17 +643,20 @@
       cursor: not-allowed;
     }
 
-    /* ===== Roll Control ===== */
-    .roll-control {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      justify-content: center;
+    .rotation-value-clickable {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
     }
+    .rotation-value-clickable[aria-pressed="true"] {
+      color: var(--color-accent);
+    }
+
+    /* ===== Roll Control ===== */
     .roll-slider-container {
-      flex: 1;
-      max-width: 200px;
+      width: 100%;
+      max-width: 250px;
     }
     .roll-slider-container[hidden] {
       display: none;
@@ -938,28 +943,6 @@
         width: 100%;
       }
 
-      .transport-controls {
-        flex-direction: column;
-        width: 100%;
-      }
-
-      .transport-btn {
-        width: 100%;
-      }
-
-      .decode-mode-selector {
-        flex-direction: column;
-        width: 100%;
-      }
-
-      .mode-btn {
-        width: 100%;
-      }
-
-      .roll-control {
-        flex-direction: column;
-      }
-
       .roll-slider-container {
         max-width: 100%;
         width: 100%;
@@ -1088,21 +1071,16 @@
         <div class="rotation-values">
           <span class="rotation-value" id="yaw-display">Yaw: 0°</span>
           <span class="rotation-value" id="pitch-display">Pitch: 0°</span>
-          <span class="rotation-value" id="roll-display">Roll: 0°</span>
+          <span class="rotation-value rotation-value-clickable" id="roll-display" role="button" tabindex="0" aria-label="Roll操作の有効/無効を切り替え" aria-pressed="false">Roll: 0°</span>
         </div>
         <button id="rotation-reset-btn" class="transport-btn" aria-label="回転をリセット">
           ↺ リセット
         </button>
       </div>
 
-      <!-- Roll Control -->
-      <div class="roll-control" id="roll-control">
-        <button id="roll-toggle-btn" class="transport-btn" aria-label="Roll操作の有効/無効" aria-pressed="false">
-          Roll
-        </button>
-        <div id="roll-slider-container" class="roll-slider-container" hidden>
-          <input type="range" id="roll-slider" class="roll-slider" min="0" max="359" step="1" value="0" aria-label="Roll角" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" />
-        </div>
+      <!-- Roll Slider (Roll表示クリックで表示/非表示) -->
+      <div id="roll-slider-container" class="roll-slider-container" hidden>
+        <input type="range" id="roll-slider" class="roll-slider" min="0" max="359" step="1" value="0" aria-label="Roll角" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" />
       </div>
 
       <!-- Decode Mode Selector -->
@@ -4155,15 +4133,14 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         RotationController.endGesture();
       });
 
-      // Roll toggle button (要件 5.8, 5.9, 5.10)
-      document.getElementById('roll-toggle-btn').addEventListener('click', () => {
+      // Roll toggle: Roll表示テキストをクリックでスライダー表示/非表示 (要件 5.8, 5.9, 5.10)
+      document.getElementById('roll-display').addEventListener('click', () => {
         const isEnabled = RotationController.state.rollToggle;
         RotationController.setRollEnabled(!isEnabled);
 
-        // Update button state
-        const btn = document.getElementById('roll-toggle-btn');
-        btn.setAttribute('aria-pressed', (!isEnabled) ? 'true' : 'false');
-        btn.classList.toggle('mode-btn-active', !isEnabled);
+        // Update roll-display state
+        const rollEl = document.getElementById('roll-display');
+        rollEl.setAttribute('aria-pressed', (!isEnabled) ? 'true' : 'false');
 
         // Show/hide slider
         document.getElementById('roll-slider-container').hidden = isEnabled; // hide if was enabled (now disabled)
