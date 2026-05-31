@@ -594,11 +594,10 @@
     /* ===== Rotation State Display ===== */
     .rotation-display {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
       width: 100%;
-      justify-content: center;
-      flex-wrap: wrap;
     }
     .rotation-values {
       display: flex;
@@ -1073,14 +1072,13 @@
           <span class="rotation-value" id="pitch-display">Pitch: 0°</span>
           <span class="rotation-value rotation-value-clickable" id="roll-display" role="button" tabindex="0" aria-label="Roll操作の有効/無効を切り替え" aria-pressed="false">Roll: 0°</span>
         </div>
+        <!-- Roll Slider (Roll表示クリックで表示/非表示、リセットボタンより上) -->
+        <div id="roll-slider-container" class="roll-slider-container" hidden>
+          <input type="range" id="roll-slider" class="roll-slider" min="0" max="359" step="1" value="0" aria-label="Roll角" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" />
+        </div>
         <button id="rotation-reset-btn" class="transport-btn" aria-label="回転をリセット">
           ↺ リセット
         </button>
-      </div>
-
-      <!-- Roll Slider (Roll表示クリックで表示/非表示) -->
-      <div id="roll-slider-container" class="roll-slider-container" hidden>
-        <input type="range" id="roll-slider" class="roll-slider" min="0" max="359" step="1" value="0" aria-label="Roll角" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0" />
       </div>
 
       <!-- Decode Mode Selector -->
