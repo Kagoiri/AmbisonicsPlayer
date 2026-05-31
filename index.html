@@ -3776,6 +3776,8 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
 
     async function handleShare() {
       // Task 19.2: 全パラメータ（回転・デコードモード含む）を state オブジェクトとして渡す
+      // 再生位置は AudioEngine から直接取得（再生中でも停止中でも正確）
+      const currentTime = audioEngine.getCurrentTime();
       const state = {
         src: AppState.track.loadingState === 'loaded' ? AppState.track.url : null,
         yaw: RotationController.state.yaw,
@@ -3784,7 +3786,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         rollToggle: RotationController.state.rollToggle,
         mode: AppState.decodeMode,
         vol: Math.round(AppState.volume * 100),
-        t: AppState.playback.currentTime,
+        t: currentTime,
         loop: AppState.isLooping,
       };
       const shareUrl = ShareManager.generateShareUrl(state);
