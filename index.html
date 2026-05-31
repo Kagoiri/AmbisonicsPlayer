@@ -2239,20 +2239,21 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         };
       },
 
-      // 差分回転を現在の行列に左から掛ける（ワールド固定軸まわりの回転）
+      // 差分回転を現在の行列に右から掛ける（body-fixed axis = intrinsic 回転）
+      // 「今向いている状態から、さらに右を向く・上を見る」
       _applyDelta(deltaYawDeg, deltaPitchDeg) {
         const DEG2RAD = Math.PI / 180;
-        // Yaw 差分: ワールドの Z 軸（鉛直軸）まわり
+        // Yaw 差分: body の Z 軸（頭の鉛直軸）まわり
         const a = deltaYawDeg * DEG2RAD;
         const ca = Math.cos(a), sa = Math.sin(a);
         const Rz = new Float64Array([ca,-sa,0, sa,ca,0, 0,0,1]);
-        // Pitch 差分: ワールドの Y 軸（左右軸）まわり
+        // Pitch 差分: body の Y 軸（頭の左右軸）まわり
         const b = deltaPitchDeg * DEG2RAD;
         const cb = Math.cos(b), sb = Math.sin(b);
         const Ry = new Float64Array([cb,0,sb, 0,1,0, -sb,0,cb]);
-        // 合成: 新しい行列 = Ry · Rz · 現在の行列
-        // （ワールド固定軸まわりの回転は左から掛ける）
-        this._matrix = this._matMul3(Ry, this._matMul3(Rz, this._matrix));
+        // Body-fixed axis の差分回転は右から掛ける:
+        // 新しい行列 = 現在の行列 · Rz · Ry
+        this._matrix = this._matMul3(this._matrix, this._matMul3(Rz, Ry));
         // オイラー角に逆分解して state を更新
         const euler = this._matrixToEuler(this._matrix);
         this.state.yaw = euler.yaw;
