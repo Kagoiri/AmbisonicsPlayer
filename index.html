@@ -1550,7 +1550,7 @@
         yaw: 0, pitch: 0, roll: 0,
         rollToggle: false,
         mode: 'binaural',
-        autoplay: false,
+        vol: 100,
         loop: false,
       };
 
@@ -1588,8 +1588,10 @@
           url.searchParams.set('mode', mode);
         }
 
-        if (state.autoplay) {
-          url.searchParams.set('autoplay', '1');
+        // vol: 0〜100 の整数（既定 100 は省略）
+        const vol = Math.round(Math.max(0, Math.min(100, (state.vol != null ? state.vol : 100))));
+        if (vol !== SHARE_DEFAULTS.vol) {
+          url.searchParams.set('vol', String(vol));
         }
 
         if (state.loop) {
@@ -1626,10 +1628,17 @@
         const rollToggle = params.get('rolltoggle') === '1';
         const modeRaw = params.get('mode');
         const mode = modeRaw === 'stereo' ? 'stereo' : 'binaural'; // default: binaural
-        const autoplay = params.get('autoplay') === '1';
+
+        let vol = SHARE_DEFAULTS.vol;
+        if (params.has('vol')) {
+          const parsed = parseInt(params.get('vol'), 10);
+          vol = isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : SHARE_DEFAULTS.vol;
+        }
+
+        const autoplay = false; // 廃止: src 指定時は常に自動再生
         const loop = params.get('loop') === '1';
 
-        return { src, yaw, pitch, roll, rollToggle, mode, autoplay, loop };
+        return { src, yaw, pitch, roll, rollToggle, mode, vol, loop };
       };
     })();
 
@@ -1721,7 +1730,7 @@
 
     // --- share-manager.js ---
     // NOTE(task 6.1): 新しい共有 URL スキーマ
-    //   (src/yaw/pitch/roll/rolltoggle/mode/autoplay/loop) を完全実装。
+    //   (src/yaw/pitch/roll/rolltoggle/mode/vol/loop) を完全実装。
     //   純粋関数 generateShareUrl / parseShareUrl は AmbiMath に委譲する。
     const ShareManager = {
       getUrlParams(urlString) {
@@ -3585,7 +3594,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
           roll: RotationController.state.roll,
           rollToggle: RotationController.state.rollToggle,
           mode: AppState.decodeMode,
-          autoplay: false,
+          vol: Math.round(AppState.volume * 100),
           loop: AppState.isLooping,
         });
 
@@ -3761,7 +3770,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         roll: RotationController.state.roll,
         rollToggle: RotationController.state.rollToggle,
         mode: AppState.decodeMode,
-        autoplay: false,
+        vol: Math.round(AppState.volume * 100),
         loop: AppState.isLooping,
       };
       const shareUrl = ShareManager.generateShareUrl(state);
@@ -4237,9 +4246,9 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
           optionItems.push('Yaw: ' + params.yaw + '° / Pitch: ' + params.pitch + '° / Roll: ' + params.roll + '°');
         }
         if (params.rollToggle) { optionItems.push('Roll操作: ON'); }
-        if (params.mode === 'binaural') { optionItems.push('モード: バイノーラル'); }
+        if (params.mode === 'stereo') { optionItems.push('モード: ステレオ'); }
+        if (params.vol !== 100) { optionItems.push('音量: ' + params.vol + '%'); }
         if (params.loop) { optionItems.push('ループ: ON'); }
-        if (params.autoplay) { optionItems.push('自動再生: ON'); }
         if (optionItems.length > 0) {
           optionsHtml = '<p style="font-size:0.78rem;color:#8888aa;margin:8px 0 0;">' + optionItems.join(' / ') + '</p>';
         }
@@ -4302,10 +4311,16 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
               UI.updateLoopState(true);
             }
 
-            // Apply autoplay (要件 13.7)
-            if (params.autoplay) {
-              handleTogglePlay();
+            // Apply volume
+            if (params.vol !== 100) {
+              const vol = params.vol / 100;
+              AppState.volume = vol;
+              audioEngine.setVolume(vol);
+              UI.els.volumeA.value = vol;
             }
+
+            // src 指定時は読み込み成功で常に自動再生
+            handleTogglePlay();
           } else {
             // 要件 13.9: 自動読み込み失敗時は日本語メッセージ表示・自動再生しない
             // handleLoadTrack already shows the error message
