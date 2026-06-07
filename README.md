@@ -6,14 +6,13 @@
 
 | バージョン | 説明 | リンク |
 |-----------|------|--------|
-| **Azimuth** | Yaw（左右方向）の回転のみ。シンプルで直感的な操作 | [▶ 開く](https://kagoiri.github.io/WebAmbisonicsPlayer/azimuth.html) |
+| **Azimuth** | Yaw（左右方向）の回転のみ。シンプルで直感的な操作 | [▶ 開く](https://kagoiri.github.io/AmbisonicsPlayer/azimuth.html) |
 | **Full** | Yaw / Pitch / Roll 全方向回転対応。クォータニオンベース | 🚧 未実装 |
 
 ## ドキュメント
 
 - [Azimuth 版の使い方](README-azimuth.md)
 - Full 版の使い方（未作成）
-- [開発者向けドキュメント](README-dev.md)
 
 ## 共通仕様
 

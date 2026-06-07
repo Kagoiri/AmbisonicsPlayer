@@ -2,7 +2,7 @@
 
 Ambisonics 音源を読み込み、左右方向（Yaw）の回転操作でリスナーの向きを変えながら、ステレオまたはバイノーラルにデコードして再生できる Web アプリケーションです。
 
-**▶ [アプリを開く](https://kagoiri.github.io/WebAmbisonicsPlayer/azimuth.html)**
+**▶ [アプリを開く](https://kagoiri.github.io/AmbisonicsPlayer/azimuth.html)**
 
 ## 特徴
 
