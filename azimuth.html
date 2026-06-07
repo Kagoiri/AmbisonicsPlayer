@@ -3870,7 +3870,7 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
       // Step 1: Try to fetch the fixed external file hrir_sh.json
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
         const response = await fetch('hrir_sh.json', { signal: controller.signal });
         clearTimeout(timeoutId);
 
@@ -3914,15 +3914,35 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
         input.accept = '.json';
         input.style.display = 'none';
         document.body.appendChild(input);
+
+        let settled = false;
+        const cleanup = () => {
+          if (input.parentNode) document.body.removeChild(input);
+        };
+
+        // Timeout: if dialog doesn't open (e.g., blocked outside user gesture context),
+        // resolve null after 500ms to avoid hanging indefinitely.
+        const timeoutId = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            resolve(null);
+          }
+        }, 500);
+
         input.addEventListener('change', () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           resolve(input.files[0] || null);
-          document.body.removeChild(input);
+          cleanup();
         });
-        // Handle cancel (no file selected)
-        // Use a focus-back heuristic since 'cancel' event is not universally supported
         input.addEventListener('cancel', () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           resolve(null);
-          document.body.removeChild(input);
+          cleanup();
         });
         input.click();
       });
