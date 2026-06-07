@@ -890,7 +890,7 @@
 <body>
   <header>
     <h1>AmbisonicsPlayer (Azimuth)</h1>
-    <a id="readme-link" class="readme-link" href="https://github.com/" target="_blank" rel="noopener noreferrer" aria-label="使い方・ドキュメントを開く">📖 使い方</a>
+    <a id="readme-link" class="readme-link" href="README-azimuth.md" target="_blank" rel="noopener noreferrer" aria-label="使い方・ドキュメントを開く">📖 使い方</a>
   </header>
 
   <main class="app-container">
@@ -1033,6 +1033,22 @@
       <div class="shortcut-item">
         <dt><kbd>Space</kbd></dt>
         <dd>再生 / 停止</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>←</kbd></dt>
+        <dd>10秒戻る</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>→</kbd></dt>
+        <dd>10秒進む</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>↑</kbd></dt>
+        <dd>音量を上げる</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>↓</kbd></dt>
+        <dd>音量を下げる</dd>
       </div>
     </dl>
   </aside>
@@ -1635,8 +1651,27 @@
               callbacks.onTogglePlay();
               break;
             }
-            // 要件 20.4: 未登録キーでは preventDefault を呼ばず再生状態も変更しない
-            //   （default で何もしない）。
+            case 'ArrowLeft': {
+              e.preventDefault();
+              callbacks.onSeekDelta(-10);
+              break;
+            }
+            case 'ArrowRight': {
+              e.preventDefault();
+              callbacks.onSeekDelta(10);
+              break;
+            }
+            case 'ArrowUp': {
+              e.preventDefault();
+              callbacks.onVolumeDelta(0.05);
+              break;
+            }
+            case 'ArrowDown': {
+              e.preventDefault();
+              callbacks.onVolumeDelta(-0.05);
+              break;
+            }
+            // 未登録キーでは preventDefault を呼ばず再生状態も変更しない。
           }
         };
         document.addEventListener('keydown', this._handler);
@@ -3909,14 +3944,14 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
       updateSourceStatus();
 
       // --- Set README link URL ---
-      // Auto-detect GitHub repo URL from github.io hosting, otherwise use a placeholder
+      // On GitHub Pages, link to the rendered README-azimuth.md in the repo
       const readmeLink = document.getElementById('readme-link');
       if (readmeLink) {
         const host = window.location.hostname;
         if (host.endsWith('.github.io')) {
           const user = host.replace('.github.io', '');
           const repo = window.location.pathname.split('/')[1] || '';
-          readmeLink.href = 'https://github.com/' + user + '/' + repo + '#readme';
+          readmeLink.href = 'https://github.com/' + user + '/' + repo + '/blob/main/README-azimuth.md';
         }
       }
 
@@ -4000,6 +4035,19 @@ registerProcessor('ambisonics-decoder-processor', AmbisonicsDecoderProcessor);
       // --- Register Keyboard Handler (task 10.5: Space → toggle play, 登録キーのみ preventDefault) ---
       KeyboardHandler.register({
         onTogglePlay: handleTogglePlay,
+        onSeekDelta: (delta) => {
+          if (!isPlayEnabled(AppState.track.loadingState === 'loaded')) return;
+          const currentTime = audioEngine.getCurrentTime();
+          const duration = audioEngine.getDuration();
+          const newTime = window.AmbiMath.clampSeek(currentTime + delta, duration);
+          handleProgressSeek(newTime);
+        },
+        onVolumeDelta: (delta) => {
+          const newVol = window.AmbiMath.clampVolume(AppState.volume + delta);
+          AppState.volume = newVol;
+          audioEngine.setVolume(newVol);
+          UI.els.volumeA.value = newVol;
+        },
       });
 
       // --- Task 14.1: 回転 UI ビジュアル（Canvas 2D 球体ギズモ）初期化 ---
